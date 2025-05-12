@@ -1,59 +1,119 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+  Platform,
+} from 'react-native';
 
-import { cn } from "@/lib/utils"
+interface AlertProps {
+  variant?: 'default' | 'destructive';
+  style?: ViewStyle;
+  children: React.ReactNode;
+}
 
-const alertVariants = cva(
-  "relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground",
-  {
-    variants: {
-      variant: {
-        default: "bg-background text-foreground",
-        destructive:
-          "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
+interface AlertTitleProps {
+  style?: TextStyle;
+  children: React.ReactNode;
+}
+
+interface AlertDescriptionProps {
+  style?: TextStyle;
+  children: React.ReactNode;
+}
+
+const Alert: React.FC<AlertProps> = ({
+  variant = 'default',
+  style,
+  children,
+}) => {
+  return (
+    <View
+      style={[
+        styles.alert,
+        variant === 'destructive' ? styles.alertDestructive : styles.alertDefault,
+        style,
+      ]}
+      accessibilityRole="alert"
+    >
+      {children}
+    </View>
+  );
+};
+
+const AlertTitle: React.FC<AlertTitleProps> = ({
+  style,
+  children,
+}) => {
+  return (
+    <Text style={[styles.title, style]}>
+      {children}
+    </Text>
+  );
+};
+
+const AlertDescription: React.FC<AlertDescriptionProps> = ({
+  style,
+  children,
+}) => {
+  return (
+    <Text style={[styles.description, style]}>
+      {children}
+    </Text>
+  );
+};
+
+interface Styles {
+  alert: ViewStyle;
+  alertDefault: ViewStyle;
+  alertDestructive: ViewStyle;
+  title: TextStyle;
+  description: TextStyle;
+}
+
+const styles = StyleSheet.create<Styles>({
+  alert: {
+    width: '100%',
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15,
+        shadowRadius: 2,
       },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
-)
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  alertDefault: {
+    backgroundColor: '#fff',
+    borderColor: '#e2e8f0',
+  },
+  alertDestructive: {
+    backgroundColor: '#fff',
+    borderColor: '#dc2626',
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 4,
+  },
+  description: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+});
 
-const Alert = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof alertVariants>
->(({ className, variant, ...props }, ref) => (
-  <div
-    ref={ref}
-    role="alert"
-    className={cn(alertVariants({ variant }), className)}
-    {...props}
-  />
-))
-Alert.displayName = "Alert"
+Alert.displayName = 'Alert';
+AlertTitle.displayName = 'AlertTitle';
+AlertDescription.displayName = 'AlertDescription';
 
-const AlertTitle = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLHeadingElement>
->(({ className, ...props }, ref) => (
-  <h5
-    ref={ref}
-    className={cn("mb-1 font-medium leading-none tracking-tight", className)}
-    {...props}
-  />
-))
-AlertTitle.displayName = "AlertTitle"
-
-const AlertDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("text-sm [&_p]:leading-relaxed", className)}
-    {...props}
-  />
-))
-AlertDescription.displayName = "AlertDescription"
-
-export { Alert, AlertTitle, AlertDescription }
+export { Alert, AlertTitle, AlertDescription };

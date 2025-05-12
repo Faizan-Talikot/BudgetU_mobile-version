@@ -1,59 +1,167 @@
 import * as React from "react"
-import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group"
-import { type VariantProps } from "class-variance-authority"
+import {
+  View,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+  StyleProp,
+} from "react-native"
 
-import { cn } from "@/lib/utils"
-import { toggleVariants } from "@/components/ui/toggle"
+interface ToggleGroupProps {
+  type?: "single" | "multiple"
+  value?: string | string[]
+  defaultValue?: string | string[]
+  onValueChange?: (value: string | string[]) => void
+  disabled?: boolean
+  style?: StyleProp<ViewStyle>
+  children: React.ReactNode
+}
 
-const ToggleGroupContext = React.createContext<
-  VariantProps<typeof toggleVariants>
->({
-  size: "default",
-  variant: "default",
+interface ToggleGroupItemProps {
+  value: string
+  disabled?: boolean
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  textStyle?: StyleProp<TextStyle>
+}
+
+const ToggleGroupContext = React.createContext<{
+  type: "single" | "multiple"
+  value: string | string[]
+  onChange: (value: string) => void
+  disabled?: boolean
+}>({
+  type: "single",
+  value: "",
+  onChange: () => { },
 })
 
-const ToggleGroup = React.forwardRef<
-  React.ElementRef<typeof ToggleGroupPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Root> &
-    VariantProps<typeof toggleVariants>
->(({ className, variant, size, children, ...props }, ref) => (
-  <ToggleGroupPrimitive.Root
-    ref={ref}
-    className={cn("flex items-center justify-center gap-1", className)}
-    {...props}
-  >
-    <ToggleGroupContext.Provider value={{ variant, size }}>
-      {children}
-    </ToggleGroupContext.Provider>
-  </ToggleGroupPrimitive.Root>
-))
+const ToggleGroup = React.forwardRef<View, ToggleGroupProps>(
+  ({
+    type = "single",
+    value: controlledValue,
+    defaultValue,
+    onValueChange,
+    disabled,
+    style,
+    children,
+  }, ref) => {
+    const [value, setValue] = React.useState<string | string[]>(
+      defaultValue || (type === "single" ? "" : [])
+    )
 
-ToggleGroup.displayName = ToggleGroupPrimitive.Root.displayName
+    const onChange = React.useCallback(
+      (itemValue: string) => {
+        let newValue: string | string[]
 
-const ToggleGroupItem = React.forwardRef<
-  React.ElementRef<typeof ToggleGroupPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Item> &
-    VariantProps<typeof toggleVariants>
->(({ className, children, variant, size, ...props }, ref) => {
-  const context = React.useContext(ToggleGroupContext)
+        if (type === "single") {
+          newValue = itemValue === value ? "" : itemValue
+        } else {
+          const currentValue = value as string[]
+          newValue = currentValue.includes(itemValue)
+            ? currentValue.filter((v) => v !== itemValue)
+            : [...currentValue, itemValue]
+        }
 
-  return (
-    <ToggleGroupPrimitive.Item
-      ref={ref}
-      className={cn(
-        toggleVariants({
-          variant: context.variant || variant,
-          size: context.size || size,
-        }),
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </ToggleGroupPrimitive.Item>
-  )
+        setValue(newValue)
+        onValueChange?.(newValue)
+      },
+      [type, value, onValueChange]
+    )
+
+    const contextValue = React.useMemo(
+      () => ({
+        type,
+        value: controlledValue !== undefined ? controlledValue : value,
+        onChange,
+        disabled,
+      }),
+      [type, controlledValue, value, onChange, disabled]
+    )
+
+    return (
+      <ToggleGroupContext.Provider value={contextValue}>
+        <View ref={ref} style={[styles.container, style]}>
+          {children}
+        </View>
+      </ToggleGroupContext.Provider>
+    )
+  }
+)
+
+const ToggleGroupItem = React.forwardRef<TouchableOpacity, ToggleGroupItemProps>(
+  ({ value, disabled, children, style, textStyle }, ref) => {
+    const { type, value: selectedValue, onChange, disabled: groupDisabled } = React.useContext(ToggleGroupContext)
+    const isSelected = type === "single"
+      ? value === selectedValue
+      : (selectedValue as string[]).includes(value)
+    const isDisabled = disabled || groupDisabled
+
+    return (
+      <TouchableOpacity
+        ref={ref}
+        style={[
+          styles.item,
+          isSelected && styles.itemSelected,
+          isDisabled && styles.itemDisabled,
+          style,
+        ]}
+        onPress={() => !isDisabled && onChange(value)}
+        disabled={isDisabled}
+        activeOpacity={0.7}
+      >
+        <Text
+          style={[
+            styles.itemText,
+            isSelected && styles.itemTextSelected,
+            isDisabled && styles.itemTextDisabled,
+            textStyle,
+          ]}
+        >
+          {children}
+        </Text>
+      </TouchableOpacity>
+    )
+  }
+)
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    borderRadius: 8,
+    backgroundColor: "#f4f4f5",
+    padding: 2,
+  },
+  item: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  itemSelected: {
+    backgroundColor: "#fff",
+  },
+  itemDisabled: {
+    opacity: 0.5,
+  },
+  itemText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  itemTextSelected: {
+    color: "#000",
+    fontWeight: "600",
+  },
+  itemTextDisabled: {
+    color: "#999",
+  },
 })
 
-ToggleGroupItem.displayName = ToggleGroupPrimitive.Item.displayName
-
-export { ToggleGroup, ToggleGroupItem }
+export {
+  ToggleGroup,
+  ToggleGroupItem,
+}

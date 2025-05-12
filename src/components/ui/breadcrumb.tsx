@@ -1,108 +1,128 @@
 import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { ChevronRight, MoreHorizontal } from "lucide-react"
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native"
+import { Feather } from "@expo/vector-icons"
 
-import { cn } from "@/lib/utils"
+interface BreadcrumbProps {
+  children: React.ReactNode
+  style?: any
+}
 
-const Breadcrumb = React.forwardRef<
-  HTMLElement,
-  React.ComponentPropsWithoutRef<"nav"> & {
-    separator?: React.ReactNode
-  }
->(({ ...props }, ref) => <nav ref={ref} aria-label="breadcrumb" {...props} />)
-Breadcrumb.displayName = "Breadcrumb"
+interface BreadcrumbItemProps {
+  children: React.ReactNode
+  style?: any
+}
 
-const BreadcrumbList = React.forwardRef<
-  HTMLOListElement,
-  React.ComponentPropsWithoutRef<"ol">
->(({ className, ...props }, ref) => (
-  <ol
-    ref={ref}
-    className={cn(
-      "flex flex-wrap items-center gap-1.5 break-words text-sm text-muted-foreground sm:gap-2.5",
-      className
-    )}
-    {...props}
-  />
-))
-BreadcrumbList.displayName = "BreadcrumbList"
+interface BreadcrumbLinkProps {
+  children: React.ReactNode
+  onPress?: () => void
+  style?: any
+}
 
-const BreadcrumbItem = React.forwardRef<
-  HTMLLIElement,
-  React.ComponentPropsWithoutRef<"li">
->(({ className, ...props }, ref) => (
-  <li
-    ref={ref}
-    className={cn("inline-flex items-center gap-1.5", className)}
-    {...props}
-  />
-))
-BreadcrumbItem.displayName = "BreadcrumbItem"
-
-const BreadcrumbLink = React.forwardRef<
-  HTMLAnchorElement,
-  React.ComponentPropsWithoutRef<"a"> & {
-    asChild?: boolean
-  }
->(({ asChild, className, ...props }, ref) => {
-  const Comp = asChild ? Slot : "a"
-
+const Breadcrumb = ({ children, style }: BreadcrumbProps) => {
   return (
-    <Comp
-      ref={ref}
-      className={cn("transition-colors hover:text-foreground", className)}
-      {...props}
-    />
+    <View style={[styles.container, style]} accessible role="navigation">
+      {children}
+    </View>
   )
+}
+
+const BreadcrumbList = React.forwardRef<View, BreadcrumbProps>(
+  ({ children, style }, ref) => (
+    <View
+      ref={ref}
+      style={[styles.list, style]}
+    >
+      {children}
+    </View>
+  )
+)
+
+const BreadcrumbItem = React.forwardRef<View, BreadcrumbItemProps>(
+  ({ children, style }, ref) => (
+    <View
+      ref={ref}
+      style={[styles.item, style]}
+    >
+      {children}
+    </View>
+  )
+)
+
+const BreadcrumbLink = React.forwardRef<TouchableOpacity, BreadcrumbLinkProps>(
+  ({ children, style, onPress }, ref) => (
+    <TouchableOpacity
+      ref={ref}
+      style={[styles.link, style]}
+      onPress={onPress}
+    >
+      <Text style={styles.linkText}>{children}</Text>
+    </TouchableOpacity>
+  )
+)
+
+const BreadcrumbPage = React.forwardRef<Text, BreadcrumbItemProps>(
+  ({ children, style }, ref) => (
+    <Text
+      ref={ref}
+      style={[styles.page, style]}
+      accessibilityRole="text"
+    >
+      {children}
+    </Text>
+  )
+)
+
+const BreadcrumbSeparator = ({ style }: { style?: any }) => (
+  <View style={[styles.separator, style]} accessibilityRole="none">
+    <Feather name="chevron-right" size={14} color="#666" />
+  </View>
+)
+
+const BreadcrumbEllipsis = ({ style }: { style?: any }) => (
+  <View style={[styles.ellipsis, style]} accessibilityRole="none">
+    <Feather name="more-horizontal" size={16} color="#666" />
+  </View>
+)
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+  },
+  list: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  item: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  link: {
+    opacity: 0.7,
+  },
+  linkText: {
+    fontSize: 14,
+    color: "#000",
+  },
+  page: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#000",
+  },
+  separator: {
+    marginHorizontal: 4,
+  },
+  ellipsis: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 })
-BreadcrumbLink.displayName = "BreadcrumbLink"
-
-const BreadcrumbPage = React.forwardRef<
-  HTMLSpanElement,
-  React.ComponentPropsWithoutRef<"span">
->(({ className, ...props }, ref) => (
-  <span
-    ref={ref}
-    role="link"
-    aria-disabled="true"
-    aria-current="page"
-    className={cn("font-normal text-foreground", className)}
-    {...props}
-  />
-))
-BreadcrumbPage.displayName = "BreadcrumbPage"
-
-const BreadcrumbSeparator = ({
-  children,
-  className,
-  ...props
-}: React.ComponentProps<"li">) => (
-  <li
-    role="presentation"
-    aria-hidden="true"
-    className={cn("[&>svg]:size-3.5", className)}
-    {...props}
-  >
-    {children ?? <ChevronRight />}
-  </li>
-)
-BreadcrumbSeparator.displayName = "BreadcrumbSeparator"
-
-const BreadcrumbEllipsis = ({
-  className,
-  ...props
-}: React.ComponentProps<"span">) => (
-  <span
-    role="presentation"
-    aria-hidden="true"
-    className={cn("flex h-9 w-9 items-center justify-center", className)}
-    {...props}
-  >
-    <MoreHorizontal className="h-4 w-4" />
-    <span className="sr-only">More</span>
-  </span>
-)
-BreadcrumbEllipsis.displayName = "BreadcrumbElipssis"
 
 export {
   Breadcrumb,

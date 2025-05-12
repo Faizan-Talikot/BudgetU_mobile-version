@@ -1,28 +1,177 @@
 import * as React from "react"
-import * as TooltipPrimitive from "@radix-ui/react-tooltip"
+import {
+  View,
+  Modal,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+  StyleProp,
+  Animated,
+  Dimensions,
+  LayoutChangeEvent,
+} from "react-native"
 
-import { cn } from "@/lib/utils"
+interface TooltipProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
 
-const TooltipProvider = TooltipPrimitive.Provider
+interface TooltipTriggerProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  onPress?: () => void
+}
 
-const Tooltip = TooltipPrimitive.Root
+interface TooltipContentProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  textStyle?: StyleProp<TextStyle>
+  visible?: boolean
+  onClose?: () => void
+  position?: { x: number; y: number }
+}
 
-const TooltipTrigger = TooltipPrimitive.Trigger
+const TooltipContext = React.createContext<{
+  visible: boolean
+  setVisible: (visible: boolean) => void
+  position: { x: number; y: number }
+  setPosition: (position: { x: number; y: number }) => void
+}>({
+  visible: false,
+  setVisible: () => { },
+  position: { x: 0, y: 0 },
+  setPosition: () => { },
+})
 
-const TooltipContent = React.forwardRef<
-  React.ElementRef<typeof TooltipPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => (
-  <TooltipPrimitive.Content
-    ref={ref}
-    sideOffset={sideOffset}
-    className={cn(
-      "z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-      className
-    )}
-    {...props}
-  />
-))
-TooltipContent.displayName = TooltipPrimitive.Content.displayName
+const Tooltip = React.forwardRef<View, TooltipProps>(
+  ({ children, style }, ref) => {
+    const [visible, setVisible] = React.useState(false)
+    const [position, setPosition] = React.useState({ x: 0, y: 0 })
 
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
+    return (
+      <TooltipContext.Provider value={{ visible, setVisible, position, setPosition }}>
+        <View ref={ref} style={style}>
+          {children}
+        </View>
+      </TooltipContext.Provider>
+    )
+  }
+)
+
+const TooltipTrigger = React.forwardRef<TouchableOpacity, TooltipTriggerProps>(
+  ({ children, style, onPress }, ref) => {
+    const { setVisible, setPosition } = React.useContext(TooltipContext)
+
+    const handlePress = (event: any) => {
+      const { pageX, pageY } = event.nativeEvent
+      setPosition({ x: pageX, y: pageY })
+      setVisible(true)
+      onPress?.()
+    }
+
+    return (
+      <TouchableOpacity
+        ref={ref}
+        style={style}
+        onPress={handlePress}
+      >
+        {children}
+      </TouchableOpacity>
+    )
+  }
+)
+
+const TooltipContent = React.forwardRef<View, TooltipContentProps>(
+  ({ children, style, textStyle, visible, onClose, position }, ref) => {
+    const context = React.useContext(TooltipContext)
+    const isVisible = visible ?? context.visible
+    const tooltipPosition = position ?? context.position
+    const fadeAnim = React.useRef(new Animated.Value(0)).current
+
+    React.useEffect(() => {
+      if (isVisible) {
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start()
+      }
+    }, [isVisible])
+
+    if (!isVisible) return null
+
+    const handleClose = () => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }).start(() => {
+        context.setVisible(false)
+        onClose?.()
+      })
+    }
+
+    return (
+      <Modal
+        transparent
+        visible={isVisible}
+        onRequestClose={handleClose}
+      >
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={handleClose}
+        >
+          <Animated.View
+            ref={ref}
+            style={[
+              styles.content,
+              {
+                opacity: fadeAnim,
+                transform: [
+                  {
+                    scale: fadeAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.95, 1],
+                    }),
+                  },
+                ],
+                top: tooltipPosition.y + 20,
+                left: tooltipPosition.x,
+              },
+              style,
+            ]}
+          >
+            {typeof children === 'string' ? (
+              <Text style={[styles.text, textStyle]}>{children}</Text>
+            ) : (
+              children
+            )}
+          </Animated.View>
+        </TouchableOpacity>
+      </Modal>
+    )
+  }
+)
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  content: {
+    position: 'absolute',
+    backgroundColor: '#000',
+    borderRadius: 4,
+    padding: 8,
+    maxWidth: 250,
+  },
+  text: {
+    color: '#fff',
+    fontSize: 12,
+  },
+})
+
+export { Tooltip, TooltipTrigger, TooltipContent }

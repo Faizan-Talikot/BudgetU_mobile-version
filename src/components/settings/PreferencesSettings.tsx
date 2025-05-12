@@ -1,4 +1,5 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, TextStyle } from 'react-native';
 import {
     Card,
     CardContent,
@@ -8,23 +9,32 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
+import { Select, SelectItem } from "@/components/ui/select";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
-} from "@/components/ui/select";
-import {
-    BellRing,
+    Bell,
     Mail,
     DollarSign,
     Clock,
     Save,
-    Loader2
-} from "lucide-react";
+    RefreshCw
+} from "lucide-react-native";
 import { useToast } from "@/components/ui/use-toast";
+
+interface Styles {
+    container: ViewStyle;
+    titleContainer: ViewStyle;
+    title: TextStyle;
+    description: TextStyle;
+    settingRow: ViewStyle;
+    settingContent: ViewStyle;
+    settingLabel: TextStyle;
+    settingDescription: TextStyle;
+    selectContainer: ViewStyle;
+    button: ViewStyle;
+    buttonDisabled: ViewStyle;
+    buttonContent: ViewStyle;
+    buttonText: TextStyle;
+}
 
 const PreferencesSettings = () => {
     const { toast } = useToast();
@@ -69,117 +79,166 @@ const PreferencesSettings = () => {
     };
 
     return (
-        <div className="space-y-8">
+        <View style={styles.container}>
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center">
-                        <BellRing className="mr-2 h-5 w-5" />
-                        Notification Preferences
-                    </CardTitle>
-                    <CardDescription>
+                    <View style={styles.titleContainer}>
+                        <Bell size={20} color="#000" />
+                        <Text style={styles.title}>Notification Preferences</Text>
+                    </View>
+                    <Text style={styles.description}>
                         Manage how and when you receive notifications from BudgetU
-                    </CardDescription>
+                    </Text>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label htmlFor="email-notifications" className="text-base">Email Notifications</Label>
-                            <p className="text-sm text-muted-foreground">
+                <CardContent>
+                    <View style={styles.settingRow}>
+                        <View style={styles.settingContent}>
+                            <Label style={styles.settingLabel}>Email Notifications</Label>
+                            <Text style={styles.settingDescription}>
                                 Receive important updates via email
-                            </p>
-                        </div>
+                            </Text>
+                        </View>
                         <Switch
-                            id="email-notifications"
                             checked={emailNotifications}
                             onCheckedChange={setEmailNotifications}
                         />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label htmlFor="budget-alerts" className="text-base">Budget Alerts</Label>
-                            <p className="text-sm text-muted-foreground">
+                    </View>
+                    <View style={styles.settingRow}>
+                        <View style={styles.settingContent}>
+                            <Label style={styles.settingLabel}>Budget Alerts</Label>
+                            <Text style={styles.settingDescription}>
                                 Get notified when you're approaching budget limits
-                            </p>
-                        </div>
+                            </Text>
+                        </View>
                         <Switch
-                            id="budget-alerts"
                             checked={budgetAlerts}
                             onCheckedChange={setBudgetAlerts}
                         />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label htmlFor="weekly-reports" className="text-base">Weekly Spending Reports</Label>
-                            <p className="text-sm text-muted-foreground">
+                    </View>
+                    <View style={styles.settingRow}>
+                        <View style={styles.settingContent}>
+                            <Label style={styles.settingLabel}>Weekly Spending Reports</Label>
+                            <Text style={styles.settingDescription}>
                                 Receive a weekly summary of your spending
-                            </p>
-                        </div>
+                            </Text>
+                        </View>
                         <Switch
-                            id="weekly-reports"
                             checked={weeklyReports}
                             onCheckedChange={setWeeklyReports}
                         />
-                    </div>
+                    </View>
                 </CardContent>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center">
-                        <DollarSign className="mr-2 h-5 w-5" />
-                        Display Preferences
-                    </CardTitle>
-                    <CardDescription>
+                    <View style={styles.titleContainer}>
+                        <DollarSign size={20} color="#000" />
+                        <Text style={styles.title}>Display Preferences</Text>
+                    </View>
+                    <Text style={styles.description}>
                         Customize how information is displayed in the app
-                    </CardDescription>
+                    </Text>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="currency">Currency</Label>
+                <CardContent>
+                    <View style={styles.selectContainer}>
+                        <Label style={styles.settingLabel}>Currency</Label>
                         <Select value={currency} onValueChange={setCurrency}>
-                            <SelectTrigger id="currency">
-                                <SelectValue placeholder="Select currency" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="USD">USD ($)</SelectItem>
-                                <SelectItem value="EUR">EUR (€)</SelectItem>
-                                <SelectItem value="GBP">GBP (£)</SelectItem>
-                                <SelectItem value="CAD">CAD (C$)</SelectItem>
-                                <SelectItem value="AUD">AUD (A$)</SelectItem>
-                                <SelectItem value="JPY">JPY (¥)</SelectItem>
-                            </SelectContent>
+                            <SelectItem value="USD">USD ($)</SelectItem>
+                            <SelectItem value="EUR">EUR (€)</SelectItem>
+                            <SelectItem value="GBP">GBP (£)</SelectItem>
+                            <SelectItem value="CAD">CAD (C$)</SelectItem>
+                            <SelectItem value="AUD">AUD (A$)</SelectItem>
+                            <SelectItem value="JPY">JPY (¥)</SelectItem>
                         </Select>
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="date-format">Date Format</Label>
+                    </View>
+                    <View style={styles.selectContainer}>
+                        <Label style={styles.settingLabel}>Date Format</Label>
                         <Select value={dateFormat} onValueChange={setDateFormat}>
-                            <SelectTrigger id="date-format">
-                                <SelectValue placeholder="Select date format" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
-                                <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
-                                <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
-                            </SelectContent>
+                            <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
+                            <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
+                            <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
                         </Select>
-                    </div>
+                    </View>
                 </CardContent>
             </Card>
 
-            <Button
-                onClick={handleSavePreferences}
+            <TouchableOpacity
+                onPress={handleSavePreferences}
                 disabled={isLoading}
-                className="flex items-center"
+                style={[styles.button, isLoading && styles.buttonDisabled]}
             >
-                {isLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                    <Save className="mr-2 h-4 w-4" />
-                )}
-                Save Preferences
-            </Button>
-        </div>
+                <View style={styles.buttonContent}>
+                    {isLoading ? (
+                        <RefreshCw size={16} color="#fff" />
+                    ) : (
+                        <Save size={16} color="#fff" />
+                    )}
+                    <Text style={styles.buttonText}>Save Preferences</Text>
+                </View>
+            </TouchableOpacity>
+        </View>
     );
 };
+
+const styles = StyleSheet.create<Styles>({
+    container: {
+        gap: 20,
+    },
+    titleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    title: {
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    description: {
+        fontSize: 14,
+        color: '#666',
+    },
+    settingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
+    settingContent: {
+        flex: 1,
+        marginRight: 16,
+    },
+    settingLabel: {
+        fontSize: 16,
+        fontWeight: '500',
+        marginBottom: 4,
+    },
+    settingDescription: {
+        fontSize: 14,
+        color: '#666',
+    },
+    selectContainer: {
+        marginBottom: 16,
+    },
+    button: {
+        backgroundColor: '#0066cc',
+        padding: 12,
+        borderRadius: 8,
+    },
+    buttonDisabled: {
+        opacity: 0.5,
+    },
+    buttonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    buttonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+});
 
 export default PreferencesSettings; 

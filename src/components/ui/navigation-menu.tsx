@@ -1,128 +1,209 @@
 import * as React from "react"
-import * as NavigationMenuPrimitive from "@radix-ui/react-navigation-menu"
-import { cva } from "class-variance-authority"
-import { ChevronDown } from "lucide-react"
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Modal,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+  StyleProp,
+  Platform,
+  Animated,
+} from "react-native"
+import { Feather } from "@expo/vector-icons"
 
-import { cn } from "@/lib/utils"
+interface NavigationMenuProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
 
-const NavigationMenu = React.forwardRef<
-  React.ElementRef<typeof NavigationMenuPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Root>
->(({ className, children, ...props }, ref) => (
-  <NavigationMenuPrimitive.Root
-    ref={ref}
-    className={cn(
-      "relative z-10 flex max-w-max flex-1 items-center justify-center",
-      className
-    )}
-    {...props}
-  >
-    {children}
-    <NavigationMenuViewport />
-  </NavigationMenuPrimitive.Root>
-))
-NavigationMenu.displayName = NavigationMenuPrimitive.Root.displayName
+interface NavigationMenuListProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  activeContent?: string | null
+  setActiveContent?: (content: string | null) => void
+}
 
-const NavigationMenuList = React.forwardRef<
-  React.ElementRef<typeof NavigationMenuPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.List>
->(({ className, ...props }, ref) => (
-  <NavigationMenuPrimitive.List
-    ref={ref}
-    className={cn(
-      "group flex flex-1 list-none items-center justify-center space-x-1",
-      className
-    )}
-    {...props}
-  />
-))
-NavigationMenuList.displayName = NavigationMenuPrimitive.List.displayName
+interface NavigationMenuItemProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
 
-const NavigationMenuItem = NavigationMenuPrimitive.Item
+interface NavigationMenuTriggerProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  onPress?: () => void
+}
 
-const navigationMenuTriggerStyle = cva(
-  "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
+interface NavigationMenuContentProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  visible?: boolean
+  onClose?: () => void
+}
+
+interface NavigationMenuLinkProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  textStyle?: StyleProp<TextStyle>
+  onPress?: () => void
+}
+
+const NavigationMenu = React.forwardRef<View, NavigationMenuProps>(
+  ({ children, style }, ref) => {
+    const [activeContent, setActiveContent] = React.useState<string | null>(null)
+
+    return (
+      <View ref={ref} style={[styles.menu, style]}>
+        {React.Children.map(children, (child) => {
+          if (!React.isValidElement(child)) return null
+
+          if (child.type === NavigationMenuList) {
+            return React.cloneElement(child as React.ReactElement<NavigationMenuListProps>, {
+              activeContent,
+              setActiveContent,
+            })
+          }
+
+          return child
+        })}
+      </View>
+    )
+  }
 )
 
-const NavigationMenuTrigger = React.forwardRef<
-  React.ElementRef<typeof NavigationMenuPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
-  <NavigationMenuPrimitive.Trigger
-    ref={ref}
-    className={cn(navigationMenuTriggerStyle(), "group", className)}
-    {...props}
-  >
-    {children}{" "}
-    <ChevronDown
-      className="relative top-[1px] ml-1 h-3 w-3 transition duration-200 group-data-[state=open]:rotate-180"
-      aria-hidden="true"
-    />
-  </NavigationMenuPrimitive.Trigger>
-))
-NavigationMenuTrigger.displayName = NavigationMenuPrimitive.Trigger.displayName
+const NavigationMenuList = React.forwardRef<View, NavigationMenuListProps>(
+  ({ children, style }, ref) => (
+    <View ref={ref} style={[styles.list, style]}>
+      {children}
+    </View>
+  )
+)
 
-const NavigationMenuContent = React.forwardRef<
-  React.ElementRef<typeof NavigationMenuPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <NavigationMenuPrimitive.Content
-    ref={ref}
-    className={cn(
-      "left-0 top-0 w-full data-[motion^=from-]:animate-in data-[motion^=to-]:animate-out data-[motion^=from-]:fade-in data-[motion^=to-]:fade-out data-[motion=from-end]:slide-in-from-right-52 data-[motion=from-start]:slide-in-from-left-52 data-[motion=to-end]:slide-out-to-right-52 data-[motion=to-start]:slide-out-to-left-52 md:absolute md:w-auto ",
-      className
-    )}
-    {...props}
-  />
-))
-NavigationMenuContent.displayName = NavigationMenuPrimitive.Content.displayName
+const NavigationMenuItem = React.forwardRef<View, NavigationMenuItemProps>(
+  ({ children, style }, ref) => (
+    <View ref={ref} style={[styles.item, style]}>
+      {children}
+    </View>
+  )
+)
 
-const NavigationMenuLink = NavigationMenuPrimitive.Link
-
-const NavigationMenuViewport = React.forwardRef<
-  React.ElementRef<typeof NavigationMenuPrimitive.Viewport>,
-  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Viewport>
->(({ className, ...props }, ref) => (
-  <div className={cn("absolute left-0 top-full flex justify-center")}>
-    <NavigationMenuPrimitive.Viewport
-      className={cn(
-        "origin-top-center relative mt-1.5 h-[var(--radix-navigation-menu-viewport-height)] w-full overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-90 md:w-[var(--radix-navigation-menu-viewport-width)]",
-        className
-      )}
+const NavigationMenuTrigger = React.forwardRef<TouchableOpacity, NavigationMenuTriggerProps>(
+  ({ children, style, onPress }, ref) => (
+    <TouchableOpacity
       ref={ref}
-      {...props}
-    />
-  </div>
-))
-NavigationMenuViewport.displayName =
-  NavigationMenuPrimitive.Viewport.displayName
+      style={[styles.trigger, style]}
+      onPress={onPress}
+    >
+      <Text style={styles.triggerText}>{children}</Text>
+      <Feather name="chevron-down" size={16} color="#000" />
+    </TouchableOpacity>
+  )
+)
 
-const NavigationMenuIndicator = React.forwardRef<
-  React.ElementRef<typeof NavigationMenuPrimitive.Indicator>,
-  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Indicator>
->(({ className, ...props }, ref) => (
-  <NavigationMenuPrimitive.Indicator
-    ref={ref}
-    className={cn(
-      "top-full z-[1] flex h-1.5 items-end justify-center overflow-hidden data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out data-[state=visible]:fade-in",
-      className
-    )}
-    {...props}
-  >
-    <div className="relative top-[60%] h-2 w-2 rotate-45 rounded-tl-sm bg-border shadow-md" />
-  </NavigationMenuPrimitive.Indicator>
-))
-NavigationMenuIndicator.displayName =
-  NavigationMenuPrimitive.Indicator.displayName
+const NavigationMenuContent = React.forwardRef<View, NavigationMenuContentProps>(
+  ({ children, style, visible, onClose }, ref) => {
+    if (!visible) return null
+
+    return (
+      <Modal transparent visible={visible} onRequestClose={onClose}>
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={onClose}
+        >
+          <View ref={ref} style={[styles.content, style]}>
+            {children}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    )
+  }
+)
+
+const NavigationMenuLink = React.forwardRef<TouchableOpacity, NavigationMenuLinkProps>(
+  ({ children, style, textStyle, onPress }, ref) => (
+    <TouchableOpacity
+      ref={ref}
+      style={[styles.link, style]}
+      onPress={onPress}
+    >
+      <Text style={[styles.linkText, textStyle]}>{children}</Text>
+    </TouchableOpacity>
+  )
+)
+
+const styles = StyleSheet.create({
+  menu: {
+    position: "relative",
+    zIndex: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  list: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  item: {
+    position: "relative",
+  },
+  trigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    height: 40,
+    paddingHorizontal: 16,
+    backgroundColor: "#fff",
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#e5e5e5",
+  },
+  triggerText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#000",
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  content: {
+    position: "absolute",
+    backgroundColor: "#fff",
+    borderRadius: 6,
+    padding: 16,
+    minWidth: 200,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  },
+  link: {
+    padding: 8,
+    borderRadius: 4,
+  },
+  linkText: {
+    fontSize: 14,
+    color: "#000",
+  },
+})
 
 export {
-  navigationMenuTriggerStyle,
   NavigationMenu,
   NavigationMenuList,
   NavigationMenuItem,
-  NavigationMenuContent,
   NavigationMenuTrigger,
+  NavigationMenuContent,
   NavigationMenuLink,
-  NavigationMenuIndicator,
-  NavigationMenuViewport,
 }

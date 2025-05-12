@@ -1,25 +1,9 @@
 import { useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Modal } from "react-native";
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
-import { cn } from "@/lib/utils";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Menu, X } from "lucide-react-native";
 import { Input } from "@/components/ui/input";
-import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { useForm, Controller } from "react-hook-form";
 import { useToast } from "@/components/ui/use-toast";
 import { authApi } from "@/lib/api";
 import { z } from "zod";
@@ -44,13 +28,13 @@ type SignupFormData = z.infer<typeof signupSchema>;
 type HeaderProps = {
   isSignupOpen: boolean;
   setIsSignupOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  navigation?: any; // Add proper type based on your navigation setup
 };
 
-const Header = ({ isSignupOpen, setIsSignupOpen }: HeaderProps) => {
+const Header = ({ isSignupOpen, setIsSignupOpen, navigation }: HeaderProps) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   const loginForm = useForm<LoginFormData>({
@@ -82,19 +66,14 @@ const Header = ({ isSignupOpen, setIsSignupOpen }: HeaderProps) => {
     setIsLoading(true);
     try {
       const result = await authApi.login(data.email, data.password);
-
-      // Store token and user info without any password data
-      localStorage.setItem("budgetu-token", result.token);
-      localStorage.setItem("budgetu-user", JSON.stringify(result.user));
-
+      // Store token and user info
+      // Navigate to dashboard
+      setIsLoginOpen(false);
+      navigation?.navigate('Dashboard');
       toast({
         title: "Login successful",
         description: "Welcome back to BudgetU!",
       });
-
-      // Close dialog and navigate to dashboard
-      setIsLoginOpen(false);
-      navigate("/dashboard");
     } catch (error) {
       console.error("Login error:", error);
       toast({
@@ -110,25 +89,15 @@ const Header = ({ isSignupOpen, setIsSignupOpen }: HeaderProps) => {
   const handleSignup = async (data: SignupFormData) => {
     setIsLoading(true);
     try {
-      const result = await authApi.register(data as {
-        firstName: string;
-        lastName: string;
-        email: string;
-        password: string;
-      });
-
-      // Store token and user info without any password data
-      localStorage.setItem("budgetu-token", result.token);
-      localStorage.setItem("budgetu-user", JSON.stringify(result.user));
-
+      const result = await authApi.register(data);
+      // Store token and user info
+      // Navigate to dashboard
+      setIsSignupOpen(false);
+      navigation?.navigate('Dashboard');
       toast({
         title: "Account created",
         description: "Welcome to BudgetU!",
       });
-
-      // Close dialog and navigate to dashboard
-      setIsSignupOpen(false);
-      navigate("/dashboard");
     } catch (error) {
       console.error("Signup error:", error);
       toast({
@@ -141,231 +110,403 @@ const Header = ({ isSignupOpen, setIsSignupOpen }: HeaderProps) => {
     }
   };
 
+  const renderLoginModal = () => (
+    <Modal
+      visible={isLoginOpen}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setIsLoginOpen(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Log in to your account</Text>
+          <Controller
+            control={loginForm.control}
+            name="email"
+            render={({ field: { onChange, value }, fieldState: { error } }) => (
+              <View style={styles.formField}>
+                <Text style={styles.label}>Email</Text>
+                <Input
+                  placeholder="you@example.com"
+                  onChangeText={onChange}
+                  value={value}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+                {error && <Text style={styles.errorText}>{error.message}</Text>}
+              </View>
+            )}
+          />
+          <Controller
+            control={loginForm.control}
+            name="password"
+            render={({ field: { onChange, value }, fieldState: { error } }) => (
+              <View style={styles.formField}>
+                <Text style={styles.label}>Password</Text>
+                <Input
+                  placeholder="••••••••"
+                  onChangeText={onChange}
+                  value={value}
+                  secureTextEntry
+                />
+                {error && <Text style={styles.errorText}>{error.message}</Text>}
+              </View>
+            )}
+          />
+          <Button
+            onPress={loginForm.handleSubmit(handleLogin)}
+            disabled={isLoading}
+            style={styles.submitButton}
+          >
+            <Text style={styles.buttonText}>
+              {isLoading ? "Logging in..." : "Log in"}
+            </Text>
+          </Button>
+          <TouchableOpacity
+            onPress={() => {
+              setIsLoginOpen(false);
+              setIsSignupOpen(true);
+            }}
+            style={styles.switchButton}
+          >
+            <Text style={styles.switchText}>Don't have an account? Sign up</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderSignupModal = () => (
+    <Modal
+      visible={isSignupOpen}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setIsSignupOpen(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Create your account</Text>
+          <View style={styles.nameFields}>
+            <Controller
+              control={signupForm.control}
+              name="firstName"
+              render={({ field: { onChange, value }, fieldState: { error } }) => (
+                <View style={[styles.formField, styles.halfWidth]}>
+                  <Text style={styles.label}>First Name</Text>
+                  <Input
+                    placeholder="John"
+                    onChangeText={onChange}
+                    value={value}
+                  />
+                  {error && <Text style={styles.errorText}>{error.message}</Text>}
+                </View>
+              )}
+            />
+            <Controller
+              control={signupForm.control}
+              name="lastName"
+              render={({ field: { onChange, value }, fieldState: { error } }) => (
+                <View style={[styles.formField, styles.halfWidth]}>
+                  <Text style={styles.label}>Last Name</Text>
+                  <Input
+                    placeholder="Doe"
+                    onChangeText={onChange}
+                    value={value}
+                  />
+                  {error && <Text style={styles.errorText}>{error.message}</Text>}
+                </View>
+              )}
+            />
+          </View>
+          <Controller
+            control={signupForm.control}
+            name="email"
+            render={({ field: { onChange, value }, fieldState: { error } }) => (
+              <View style={styles.formField}>
+                <Text style={styles.label}>Email</Text>
+                <Input
+                  placeholder="you@example.com"
+                  onChangeText={onChange}
+                  value={value}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+                {error && <Text style={styles.errorText}>{error.message}</Text>}
+              </View>
+            )}
+          />
+          <Controller
+            control={signupForm.control}
+            name="password"
+            render={({ field: { onChange, value }, fieldState: { error } }) => (
+              <View style={styles.formField}>
+                <Text style={styles.label}>Password</Text>
+                <Input
+                  placeholder="••••••••"
+                  onChangeText={onChange}
+                  value={value}
+                  secureTextEntry
+                />
+                {error && <Text style={styles.errorText}>{error.message}</Text>}
+              </View>
+            )}
+          />
+          <Button
+            onPress={signupForm.handleSubmit(handleSignup)}
+            disabled={isLoading}
+            style={styles.submitButton}
+          >
+            <Text style={styles.buttonText}>
+              {isLoading ? "Creating account..." : "Create account"}
+            </Text>
+          </Button>
+          <TouchableOpacity
+            onPress={() => {
+              setIsSignupOpen(false);
+              setIsLoginOpen(true);
+            }}
+            style={styles.switchButton}
+          >
+            <Text style={styles.switchText}>Already have an account? Log in</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
   return (
-    <header className="sticky top-0 z-50 w-full backdrop-blur-sm border-b bg-background/80">
-      <div className="budgetu-container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-2">
-          <a href="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 bg-budgetu-purple rounded-md flex items-center justify-center">
-              <span className="text-white font-bold text-lg">B</span>
-            </div>
-            <span className="font-bold text-xl">BudgetU</span>
-          </a>
-        </div>
+    <View style={styles.header}>
+      <View style={styles.container}>
+        <TouchableOpacity style={styles.logo}>
+          <View style={styles.logoIcon}>
+            <Text style={styles.logoText}>B</Text>
+          </View>
+          <Text style={styles.logoTitle}>BudgetU</Text>
+        </TouchableOpacity>
 
         {/* Desktop menu */}
-        <nav className="hidden md:flex items-center gap-6">
+        <View style={styles.desktopNav}>
           {navItems.map((item) => (
-            <a
-              key={item.label}
-              href={item.href}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {item.label}
-            </a>
+            <TouchableOpacity key={item.label} style={styles.navItem}>
+              <Text style={styles.navText}>{item.label}</Text>
+            </TouchableOpacity>
           ))}
-        </nav>
+        </View>
 
-        <div className="hidden md:flex items-center gap-4">
-          <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">Log In</Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Log in to your account</DialogTitle>
-              </DialogHeader>
-              <Form {...loginForm}>
-                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4 pt-4">
-                  <FormField
-                    control={loginForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input placeholder="you@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={loginForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Logging in..." : "Log in"}
-                  </Button>
-                  <div className="text-center text-sm mt-4">
-                    <span className="text-muted-foreground">Don't have an account? </span>
-                    <button
-                      type="button"
-                      className="text-budgetu-purple hover:underline font-medium"
-                      onClick={() => {
-                        setIsLoginOpen(false);
-                        setIsSignupOpen(true);
-                      }}
-                    >
-                      Sign up
-                    </button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={isSignupOpen} onOpenChange={setIsSignupOpen}>
-            <DialogTrigger asChild>
-              <Button>Sign Up Free</Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Create your account</DialogTitle>
-              </DialogHeader>
-              <Form {...signupForm}>
-                <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4 pt-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={signupForm.control}
-                      name="firstName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>First Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="John" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={signupForm.control}
-                      name="lastName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Last Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Doe" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <FormField
-                    control={signupForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input placeholder="you@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={signupForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Creating account..." : "Create account"}
-                  </Button>
-                  <div className="text-center text-sm mt-4">
-                    <span className="text-muted-foreground">Already have an account? </span>
-                    <button
-                      type="button"
-                      className="text-budgetu-purple hover:underline font-medium"
-                      onClick={() => {
-                        setIsSignupOpen(false);
-                        setIsLoginOpen(true);
-                      }}
-                    >
-                      Log in
-                    </button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
+        <View style={styles.buttons}>
+          <Button
+            onPress={() => setIsLoginOpen(true)}
+            variant="outline"
+            style={styles.loginButton}
+          >
+            <Text>Log In</Text>
+          </Button>
+          <Button
+            onPress={() => setIsSignupOpen(true)}
+            style={styles.signupButton}
+          >
+            <Text style={styles.signupButtonText}>Sign Up Free</Text>
+          </Button>
+        </View>
 
         {/* Mobile menu button */}
-        <button
-          className="md:hidden"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        <TouchableOpacity
+          style={styles.mobileMenuButton}
+          onPress={() => setMobileMenuOpen(!mobileMenuOpen)}
         >
           {mobileMenuOpen ? (
-            <X className="h-6 w-6" />
+            <X size={24} />
           ) : (
-            <Menu className="h-6 w-6" />
+            <Menu size={24} />
           )}
-        </button>
-      </div>
+        </TouchableOpacity>
 
-      {/* Mobile menu */}
-      <div
-        className={cn(
-          "fixed inset-0 top-16 z-50 bg-background md:hidden",
-          mobileMenuOpen ? "flex flex-col" : "hidden"
-        )}
-      >
-        <nav className="flex flex-col items-center gap-6 p-6">
-          {navItems.map((item) => (
-            <a
-              key={item.label}
-              href={item.href}
-              className="text-lg font-medium"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              {item.label}
-            </a>
-          ))}
-          <div className="flex flex-col w-full gap-2 mt-4">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                setIsLoginOpen(true);
-              }}
-            >
-              Log In
-            </Button>
-            <Button
-              className="w-full"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                setIsSignupOpen(true);
-              }}
-            >
-              Sign Up Free
-            </Button>
-          </div>
-        </nav>
-      </div>
-    </header>
+        {/* Mobile menu */}
+        <Modal
+          visible={mobileMenuOpen}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setMobileMenuOpen(false)}
+        >
+          <View style={styles.mobileMenu}>
+            {navItems.map((item) => (
+              <TouchableOpacity
+                key={item.label}
+                style={styles.mobileMenuItem}
+                onPress={() => setMobileMenuOpen(false)}
+              >
+                <Text style={styles.mobileMenuText}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+            <View style={styles.mobileButtons}>
+              <Button
+                onPress={() => {
+                  setMobileMenuOpen(false);
+                  setIsLoginOpen(true);
+                }}
+                variant="outline"
+                style={styles.mobileButton}
+              >
+                <Text>Log In</Text>
+              </Button>
+              <Button
+                onPress={() => {
+                  setMobileMenuOpen(false);
+                  setIsSignupOpen(true);
+                }}
+                style={styles.mobileButton}
+              >
+                <Text style={styles.signupButtonText}>Sign Up Free</Text>
+              </Button>
+            </View>
+          </View>
+        </Modal>
+
+        {renderLoginModal()}
+        {renderSignupModal()}
+      </View>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  header: {
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+  },
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    height: 64,
+  },
+  logo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  logoIcon: {
+    height: 32,
+    width: 32,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
+  logoTitle: {
+    fontWeight: 'bold',
+    fontSize: 20,
+  },
+  desktopNav: {
+    flexDirection: 'row',
+    gap: 24,
+    display: 'none', // Show only on larger screens
+  },
+  navItem: {
+    padding: 8,
+  },
+  navText: {
+    color: '#666',
+  },
+  buttons: {
+    flexDirection: 'row',
+    gap: 16,
+    display: 'none', // Show only on larger screens
+  },
+  loginButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+  },
+  signupButton: {
+    backgroundColor: '#8B5CF6',
+  },
+  signupButtonText: {
+    color: '#fff',
+  },
+  mobileMenuButton: {
+    padding: 8,
+  },
+  mobileMenu: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingTop: 64,
+  },
+  mobileMenuItem: {
+    padding: 16,
+  },
+  mobileMenuText: {
+    fontSize: 18,
+    fontWeight: '500',
+  },
+  mobileButtons: {
+    padding: 16,
+    gap: 8,
+  },
+  mobileButton: {
+    width: '100%',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 24,
+  },
+  formField: {
+    marginBottom: 16,
+  },
+  nameFields: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  halfWidth: {
+    flex: 1,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  submitButton: {
+    marginTop: 8,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  switchButton: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  switchText: {
+    color: '#8B5CF6',
+    fontSize: 14,
+  },
+});
 
 export default Header;

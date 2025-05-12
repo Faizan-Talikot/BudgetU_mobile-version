@@ -1,4 +1,4 @@
-
+import { View, Text, StyleSheet } from "react-native";
 import {
   Accordion,
   AccordionContent,
@@ -41,32 +41,69 @@ const FAQ = () => {
   ];
 
   return (
-    <section className="py-20 bg-secondary/50" id="faq">
-      <div className="budgetu-container">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Frequently Asked <span className="text-gradient">Questions</span>
-          </h2>
-          <p className="text-lg text-muted-foreground">
+    <View style={styles.section}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>
+            Frequently Asked <Text style={styles.gradient}>Questions</Text>
+          </Text>
+          <Text style={styles.subtitle}>
             Everything you need to know about using BudgetU for your student finances.
-          </p>
-        </div>
+          </Text>
+        </View>
 
-        <div className="max-w-3xl mx-auto">
-          <Accordion type="single" collapsible className="w-full">
+        <View style={styles.content}>
+          <Accordion type="single">
             {faqs.map((faq, index) => (
               <AccordionItem key={index} value={`item-${index}`}>
-                <AccordionTrigger className="text-left">
+                <AccordionTrigger>
                   {faq.question}
                 </AccordionTrigger>
-                <AccordionContent>{faq.answer}</AccordionContent>
+                <AccordionContent>
+                  {faq.answer}
+                </AccordionContent>
               </AccordionItem>
             ))}
           </Accordion>
-        </div>
-      </div>
-    </section>
+        </View>
+      </View>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  section: {
+    paddingVertical: 80,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  container: {
+    paddingHorizontal: 16,
+  },
+  header: {
+    maxWidth: 768,
+    alignSelf: 'center',
+    alignItems: 'center',
+    marginBottom: 64,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  gradient: {
+    color: '#8B5CF6',
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+  },
+  content: {
+    maxWidth: 768,
+    alignSelf: 'center',
+    width: '100%',
+  },
+});
 
 export default FAQ;

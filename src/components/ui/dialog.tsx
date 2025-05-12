@@ -1,117 +1,227 @@
 import * as React from "react"
-import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { X } from "lucide-react"
+import {
+  Modal,
+  View,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+  StyleProp,
+  Animated,
+  Dimensions,
+  Platform,
+} from "react-native"
+import { Feather } from "@expo/vector-icons"
 
-import { cn } from "@/lib/utils"
+interface DialogProps {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
 
-const Dialog = DialogPrimitive.Root
+interface DialogContentProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
 
-const DialogTrigger = DialogPrimitive.Trigger
+interface DialogHeaderProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
 
-const DialogPortal = DialogPrimitive.Portal
+interface DialogFooterProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
 
-const DialogClose = DialogPrimitive.Close
+interface DialogTitleProps {
+  children: React.ReactNode
+  style?: StyleProp<TextStyle>
+}
 
-const DialogOverlay = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Overlay
-    ref={ref}
-    className={cn(
-      "fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-      className
-    )}
-    {...props}
-  />
-))
-DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
+interface DialogDescriptionProps {
+  children: React.ReactNode
+  style?: StyleProp<TextStyle>
+}
 
-const DialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
-        className
-      )}
-      {...props}
-    >
-      {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-))
-DialogContent.displayName = DialogPrimitive.Content.displayName
+const Dialog = React.forwardRef<View, DialogProps>(
+  ({ open = false, onOpenChange, children, style }, ref) => {
+    const [visible, setVisible] = React.useState(open)
+    const fadeAnim = React.useRef(new Animated.Value(0)).current
+    const scaleAnim = React.useRef(new Animated.Value(0.95)).current
 
-const DialogHeader = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn(
-      "flex flex-col space-y-1.5 text-center sm:text-left",
-      className
-    )}
-    {...props}
-  />
+    React.useEffect(() => {
+      setVisible(open)
+      if (open) {
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.spring(scaleAnim, {
+            toValue: 1,
+            useNativeDriver: true,
+          }),
+        ]).start()
+      }
+    }, [open, fadeAnim, scaleAnim])
+
+    const handleClose = () => {
+      if (onOpenChange) {
+        onOpenChange(false)
+      }
+    }
+
+    return (
+      <Modal
+        visible={visible}
+        transparent
+        animationType="none"
+        onRequestClose={handleClose}
+      >
+        <View ref={ref} style={[styles.container, style]}>
+          <Animated.View
+            style={[
+              styles.backdrop,
+              {
+                opacity: fadeAnim,
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.backdropTouchable}
+              onPress={handleClose}
+              activeOpacity={1}
+            />
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.content,
+              {
+                opacity: fadeAnim,
+                transform: [{ scale: scaleAnim }],
+              },
+            ]}
+          >
+            {children}
+          </Animated.View>
+        </View>
+      </Modal>
+    )
+  }
 )
-DialogHeader.displayName = "DialogHeader"
 
-const DialogFooter = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn(
-      "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
-      className
-    )}
-    {...props}
-  />
+const DialogContent = React.forwardRef<View, DialogContentProps>(
+  ({ children, style }, ref) => {
+    return (
+      <View ref={ref} style={[styles.dialogContent, style]}>
+        {children}
+      </View>
+    )
+  }
 )
-DialogFooter.displayName = "DialogFooter"
 
-const DialogTitle = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Title
-    ref={ref}
-    className={cn(
-      "text-lg font-semibold leading-none tracking-tight",
-      className
-    )}
-    {...props}
-  />
-))
-DialogTitle.displayName = DialogPrimitive.Title.displayName
+const DialogHeader = React.forwardRef<View, DialogHeaderProps>(
+  ({ children, style }, ref) => {
+    return (
+      <View ref={ref} style={[styles.header, style]}>
+        {children}
+      </View>
+    )
+  }
+)
 
-const DialogDescription = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Description>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Description
-    ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
-    {...props}
-  />
-))
-DialogDescription.displayName = DialogPrimitive.Description.displayName
+const DialogFooter = React.forwardRef<View, DialogFooterProps>(
+  ({ children, style }, ref) => {
+    return (
+      <View ref={ref} style={[styles.footer, style]}>
+        {children}
+      </View>
+    )
+  }
+)
+
+const DialogTitle = React.forwardRef<Text, DialogTitleProps>(
+  ({ children, style }, ref) => {
+    return (
+      <Text ref={ref} style={[styles.title, style]}>
+        {children}
+      </Text>
+    )
+  }
+)
+
+const DialogDescription = React.forwardRef<Text, DialogDescriptionProps>(
+  ({ children, style }, ref) => {
+    return (
+      <Text ref={ref} style={[styles.description, style]}>
+        {children}
+      </Text>
+    )
+  }
+)
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  backdropTouchable: {
+    flex: 1,
+  },
+  content: {
+    width: Math.min(Dimensions.get("window").width - 32, 400),
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  },
+  dialogContent: {
+    padding: 16,
+  },
+  header: {
+    padding: 16,
+    paddingBottom: 0,
+  },
+  footer: {
+    padding: 16,
+    paddingTop: 0,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#000",
+    marginBottom: 4,
+  },
+  description: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 16,
+  },
+})
 
 export {
   Dialog,
-  DialogPortal,
-  DialogOverlay,
-  DialogClose,
-  DialogTrigger,
   DialogContent,
   DialogHeader,
   DialogFooter,

@@ -1,20 +1,10 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert as RNAlert, ViewStyle, TextStyle } from 'react-native';
+import { useForm, Controller, FieldError, Control, ControllerRenderProps, FieldValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Loader2, Info } from "lucide-react";
+import { Info, Save, RefreshCw } from "lucide-react-native";
 import { useToast } from "@/components/ui/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authApi, logout } from "@/lib/api";
 
 // Validation schema
@@ -31,12 +21,60 @@ const passwordSchema = z
 
 type PasswordFormValues = z.infer<typeof passwordSchema>;
 
+interface FormFieldProps {
+    onChange: (value: string) => void;
+    value: string;
+    error?: FieldError;
+    label: string;
+    placeholder?: string;
+}
+
+interface FieldRenderProps {
+    field: {
+        onChange: (value: string) => void;
+        value: string;
+    };
+    fieldState: {
+        error?: FieldError;
+    };
+}
+
+interface Styles {
+    container: ViewStyle;
+    alert: ViewStyle;
+    alertContent: ViewStyle;
+    title: TextStyle;
+    description: TextStyle;
+    form: ViewStyle;
+    formItem: ViewStyle;
+    label: TextStyle;
+    input: ViewStyle;
+    errorText: TextStyle;
+    button: ViewStyle;
+    buttonDisabled: ViewStyle;
+    buttonContent: ViewStyle;
+    buttonText: TextStyle;
+}
+
+const FormField = ({ onChange, value, error, label, placeholder }: FormFieldProps) => (
+    <View style={styles.formItem}>
+        <Text style={styles.label}>{label}</Text>
+        <TextInput
+            style={styles.input}
+            secureTextEntry
+            placeholder={placeholder || "••••••••"}
+            onChangeText={onChange}
+            value={value}
+        />
+        {error && <Text style={styles.errorText}>{error.message}</Text>}
+    </View>
+);
+
 const SecuritySettings = () => {
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
 
-    // Initialize form with default values
-    const form = useForm<PasswordFormValues>({
+    const { control, handleSubmit, setError, reset } = useForm<PasswordFormValues>({
         resolver: zodResolver(passwordSchema),
         defaultValues: {
             currentPassword: "",
@@ -45,11 +83,9 @@ const SecuritySettings = () => {
         },
     });
 
-    // Handle form submission
     const onSubmit = async (data: PasswordFormValues) => {
         setIsLoading(true);
         try {
-            // Call the API to change password
             await authApi.changePassword(data.currentPassword, data.newPassword);
 
             toast({
@@ -57,14 +93,12 @@ const SecuritySettings = () => {
                 description: "Your password has been changed successfully. Please log in again with your new password.",
             });
 
-            // Force logout and redirect
             setTimeout(() => {
                 logout();
-                window.location.href = "/";
+                // Navigate to login screen
             }, 1500);
 
-            // Reset the form
-            form.reset({
+            reset({
                 currentPassword: "",
                 newPassword: "",
                 confirmPassword: "",
@@ -72,18 +106,16 @@ const SecuritySettings = () => {
         } catch (error) {
             console.error("Error updating password:", error);
 
-            // Handle specific error for incorrect current password
             if (error instanceof Error && error.message.includes("Current password is incorrect")) {
-                form.setError("currentPassword", {
+                setError("currentPassword", {
                     type: "manual",
                     message: "Current password is incorrect"
                 });
             } else {
-                toast({
-                    title: "Update failed",
-                    description: error instanceof Error ? error.message : "There was an error updating your password. Please try again.",
-                    variant: "destructive",
-                });
+                RNAlert.alert(
+                    "Update failed",
+                    error instanceof Error ? error.message : "There was an error updating your password. Please try again."
+                );
             }
         } finally {
             setIsLoading(false);
@@ -91,65 +123,144 @@ const SecuritySettings = () => {
     };
 
     return (
-        <div className="space-y-6">
-            <Alert>
-                <Info className="h-4 w-4" />
-                <AlertTitle>Password Security</AlertTitle>
-                <AlertDescription>
+        <View style={styles.container}>
+            <View style={styles.alert}>
+                <View style={styles.alertContent}>
+                    <Info size={16} color="#666" />
+                    <Text style={styles.title}>Password Security</Text>
+                </View>
+                <Text style={styles.description}>
                     Use a strong password that you don't use on other websites.
                     A strong password is at least 8 characters, includes numbers and special characters.
-                </AlertDescription>
-            </Alert>
+                </Text>
+            </View>
 
-            <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField
-                        control={form.control}
-                        name="currentPassword"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Current Password</FormLabel>
-                                <FormControl>
-                                    <Input type="password" placeholder="••••••••" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
+            <View style={styles.form}>
+                <Controller<PasswordFormValues>
+                    control={control}
+                    name="currentPassword"
+                    render={({ field: { onChange, value }, fieldState: { error } }: FieldRenderProps) => (
+                        <FormField
+                            onChange={onChange}
+                            value={value}
+                            error={error}
+                            label="Current Password"
+                        />
+                    )}
+                />
+
+                <Controller<PasswordFormValues>
+                    control={control}
+                    name="newPassword"
+                    render={({ field: { onChange, value }, fieldState: { error } }: FieldRenderProps) => (
+                        <FormField
+                            onChange={onChange}
+                            value={value}
+                            error={error}
+                            label="New Password"
+                        />
+                    )}
+                />
+
+                <Controller<PasswordFormValues>
+                    control={control}
+                    name="confirmPassword"
+                    render={({ field: { onChange, value }, fieldState: { error } }: FieldRenderProps) => (
+                        <FormField
+                            onChange={onChange}
+                            value={value}
+                            error={error}
+                            label="Confirm New Password"
+                        />
+                    )}
+                />
+
+                <TouchableOpacity
+                    onPress={handleSubmit(onSubmit)}
+                    disabled={isLoading}
+                    style={[styles.button, isLoading && styles.buttonDisabled]}
+                >
+                    <View style={styles.buttonContent}>
+                        {isLoading ? (
+                            <RefreshCw size={16} color="#fff" />
+                        ) : (
+                            <Save size={16} color="#fff" />
                         )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="newPassword"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>New Password</FormLabel>
-                                <FormControl>
-                                    <Input type="password" placeholder="••••••••" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="confirmPassword"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Confirm New Password</FormLabel>
-                                <FormControl>
-                                    <Input type="password" placeholder="••••••••" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <Button type="submit" disabled={isLoading} className="mt-4">
-                        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Change Password
-                    </Button>
-                </form>
-            </Form>
-        </div>
+                        <Text style={styles.buttonText}>Change Password</Text>
+                    </View>
+                </TouchableOpacity>
+            </View>
+        </View>
     );
 };
+
+const styles = StyleSheet.create<Styles>({
+    container: {
+        gap: 24,
+    },
+    alert: {
+        backgroundColor: '#f8f9fa',
+        padding: 16,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+    },
+    alertContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 8,
+    },
+    title: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#000',
+    },
+    description: {
+        fontSize: 14,
+        color: '#666',
+    },
+    form: {
+        gap: 16,
+    },
+    formItem: {
+        gap: 8,
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#000',
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+        borderRadius: 8,
+        padding: 12,
+    },
+    errorText: {
+        fontSize: 12,
+        color: '#dc3545',
+    },
+    button: {
+        backgroundColor: '#0066cc',
+        padding: 12,
+        borderRadius: 8,
+        marginTop: 8,
+    },
+    buttonDisabled: {
+        opacity: 0.5,
+    },
+    buttonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    buttonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+});
 
 export default SecuritySettings; 

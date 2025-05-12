@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react-native";
+import { View, Text, StyleSheet } from 'react-native';
 
 type CallToActionProps = {
   openSignupDialog: () => void;
@@ -7,32 +8,85 @@ type CallToActionProps = {
 
 const CallToAction = ({ openSignupDialog }: CallToActionProps) => {
   return (
-    <section className="py-24">
-      <div className="budgetu-container">
-        <div className="bg-gradient-to-r from-budgetu-purple to-budgetu-vivid-purple rounded-3xl p-12 text-white text-center">
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+    <View style={styles.section}>
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <View style={styles.textContainer}>
+            <Text style={styles.title}>
               Ready to Take Control of Your Student Finances?
-            </h2>
-            <p className="text-lg opacity-90 mb-8">
+            </Text>
+            <Text style={styles.description}>
               Join thousands of students who never run out of money before the month ends.
               Start managing your finances the smart way.
-            </p>
+            </Text>
             <Button
-              size="lg"
-              className="bg-white text-budgetu-dark-purple hover:bg-white/90"
-              onClick={openSignupDialog}
+              onPress={openSignupDialog}
+              style={styles.button}
             >
-              Get Started For Free <ArrowRight className="ml-2 h-4 w-4" />
+              <View style={styles.buttonContent}>
+                <Text style={styles.buttonText}>Get Started For Free</Text>
+                <ArrowRight size={16} color="#000" />
+              </View>
             </Button>
-            <p className="mt-4 text-sm opacity-80">
+            <Text style={styles.disclaimer}>
               No credit card required. Cancel anytime.
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  section: {
+    paddingVertical: 96,
+  },
+  container: {
+    paddingHorizontal: 16,
+  },
+  content: {
+    backgroundColor: '#8B5CF6',
+    borderRadius: 24,
+    padding: 48,
+  },
+  textContainer: {
+    maxWidth: 768,
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  description: {
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  button: {
+    backgroundColor: '#fff',
+    marginBottom: 16,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  buttonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  disclaimer: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+  },
+});
 
 export default CallToAction;

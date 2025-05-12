@@ -1,5 +1,6 @@
+import { View, Text, StyleSheet } from "react-native";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react-native";
 
 type HowItWorksProps = {
   openSignupDialog: () => void;
@@ -30,46 +31,131 @@ const HowItWorks = ({ openSignupDialog }: HowItWorksProps) => {
   ];
 
   return (
-    <section className="py-20" id="how-it-works">
-      <div className="budgetu-container">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            How <span className="text-gradient">BudgetU</span> Works
-          </h2>
-          <p className="text-lg text-muted-foreground">
+    <View style={styles.section}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>
+            How <Text style={styles.gradient}>BudgetU</Text> Works
+          </Text>
+          <Text style={styles.subtitle}>
             Getting started is simple - you'll be managing your money like a pro in minutes.
-          </p>
-        </div>
+          </Text>
+        </View>
 
-        <div className="grid gap-8 md:gap-12">
+        <View style={styles.stepsContainer}>
           {steps.map((step, index) => (
-            <div
-              key={index}
-              className="flex flex-col md:flex-row gap-6 items-start md:items-center bg-background rounded-2xl p-6 border"
-            >
-              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-budgetu-purple/10 flex items-center justify-center text-budgetu-purple font-bold">
-                {step.number}
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
-                <p className="text-muted-foreground">{step.description}</p>
-              </div>
-            </div>
+            <View key={index} style={styles.stepCard}>
+              <View style={styles.stepNumber}>
+                <Text style={styles.stepNumberText}>{step.number}</Text>
+              </View>
+              <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>{step.title}</Text>
+                <Text style={styles.stepDescription}>{step.description}</Text>
+              </View>
+            </View>
           ))}
-        </div>
+        </View>
 
-        <div className="mt-12 text-center">
+        <View style={styles.buttonContainer}>
           <Button
-            size="lg"
-            className="bg-budgetu-orange hover:bg-budgetu-orange/90"
-            onClick={openSignupDialog}
+            onPress={openSignupDialog}
+            style={styles.button}
           >
-            Get Started Now <ArrowRight className="ml-2 h-4 w-4" />
+            <View style={styles.buttonContent}>
+              <Text style={styles.buttonText}>Get Started Now</Text>
+              <ArrowRight size={16} color="#fff" style={styles.buttonIcon} />
+            </View>
           </Button>
-        </div>
-      </div>
-    </section>
+        </View>
+      </View>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  section: {
+    paddingVertical: 80,
+  },
+  container: {
+    paddingHorizontal: 16,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 64,
+    maxWidth: 768,
+    alignSelf: 'center',
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  gradient: {
+    color: '#8B5CF6',
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+  },
+  stepsContainer: {
+    gap: 24,
+  },
+  stepCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+    gap: 24,
+  },
+  stepNumber: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepNumberText: {
+    color: '#8B5CF6',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  stepDescription: {
+    fontSize: 16,
+    color: '#666',
+  },
+  buttonContainer: {
+    marginTop: 48,
+    alignItems: 'center',
+  },
+  button: {
+    backgroundColor: '#F97316',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonIcon: {
+    marginLeft: 8,
+  },
+});
 
 export default HowItWorks;

@@ -1,27 +1,121 @@
 import * as React from "react"
-import * as SwitchPrimitives from "@radix-ui/react-switch"
+import {
+  View,
+  TouchableOpacity,
+  StyleSheet,
+  ViewStyle,
+  StyleProp,
+  Animated,
+  Platform,
+} from "react-native"
 
-import { cn } from "@/lib/utils"
+interface SwitchProps {
+  checked?: boolean
+  defaultChecked?: boolean
+  onCheckedChange?: (checked: boolean) => void
+  style?: StyleProp<ViewStyle>
+}
 
-const Switch = React.forwardRef<
-  React.ElementRef<typeof SwitchPrimitives.Root>,
-  React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
->(({ className, ...props }, ref) => (
-  <SwitchPrimitives.Root
-    className={cn(
-      "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
-      className
-    )}
-    {...props}
-    ref={ref}
-  >
-    <SwitchPrimitives.Thumb
-      className={cn(
-        "pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
-      )}
-    />
-  </SwitchPrimitives.Root>
-))
-Switch.displayName = SwitchPrimitives.Root.displayName
+const Switch = React.forwardRef<TouchableOpacity, SwitchProps>(
+  ({ checked: checkedProp, defaultChecked = false, onCheckedChange, style }, ref) => {
+    const [checked, setChecked] = React.useState(defaultChecked)
+    const translateX = React.useRef(new Animated.Value(checked ? 20 : 0)).current
+    const backgroundColor = React.useRef(new Animated.Value(checked ? 1 : 0)).current
+
+    const handlePress = () => {
+      const newChecked = !checked
+      setChecked(newChecked)
+      onCheckedChange?.(newChecked)
+
+      Animated.parallel([
+        Animated.spring(translateX, {
+          toValue: newChecked ? 20 : 0,
+          useNativeDriver: true,
+        }),
+        Animated.timing(backgroundColor, {
+          toValue: newChecked ? 1 : 0,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+      ]).start()
+    }
+
+    React.useEffect(() => {
+      if (checkedProp !== undefined) {
+        setChecked(checkedProp)
+        Animated.parallel([
+          Animated.spring(translateX, {
+            toValue: checkedProp ? 20 : 0,
+            useNativeDriver: true,
+          }),
+          Animated.timing(backgroundColor, {
+            toValue: checkedProp ? 1 : 0,
+            duration: 200,
+            useNativeDriver: false,
+          }),
+        ]).start()
+      }
+    }, [checkedProp])
+
+    return (
+      <TouchableOpacity
+        ref={ref}
+        style={[styles.container, style]}
+        onPress={handlePress}
+        activeOpacity={0.8}
+      >
+        <Animated.View
+          style={[
+            styles.track,
+            {
+              backgroundColor: backgroundColor.interpolate({
+                inputRange: [0, 1],
+                outputRange: ["#e5e5e5", "#22c55e"],
+              }),
+            },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.thumb,
+              {
+                transform: [{ translateX }],
+              },
+            ]}
+          />
+        </Animated.View>
+      </TouchableOpacity>
+    )
+  }
+)
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 2,
+  },
+  track: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+  },
+  thumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  },
+})
 
 export { Switch }

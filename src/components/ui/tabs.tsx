@@ -1,53 +1,165 @@
 import * as React from "react"
-import * as TabsPrimitive from "@radix-ui/react-tabs"
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+  StyleProp,
+  Animated,
+  LayoutChangeEvent,
+} from "react-native"
 
-import { cn } from "@/lib/utils"
+interface TabsProps {
+  defaultValue?: string
+  value?: string
+  onValueChange?: (value: string) => void
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
 
-const Tabs = TabsPrimitive.Root
+interface TabsListProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
 
-const TabsList = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.List
-    ref={ref}
-    className={cn(
-      "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
-      className
-    )}
-    {...props}
-  />
-))
-TabsList.displayName = TabsPrimitive.List.displayName
+interface TabsTriggerProps {
+  value: string
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
 
-const TabsTrigger = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-      className
-    )}
-    {...props}
-  />
-))
-TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
+interface TabsContentProps {
+  value: string
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
 
-const TabsContent = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Content
-    ref={ref}
-    className={cn(
-      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-      className
-    )}
-    {...props}
-  />
-))
-TabsContent.displayName = TabsPrimitive.Content.displayName
+const TabsContext = React.createContext<{
+  value: string
+  onChange: (value: string) => void
+}>({
+  value: "",
+  onChange: () => { },
+})
 
-export { Tabs, TabsList, TabsTrigger, TabsContent }
+const Tabs = React.forwardRef<View, TabsProps>(
+  ({ defaultValue, value: controlledValue, onValueChange, children, style }, ref) => {
+    const [value, setValue] = React.useState(defaultValue || "")
+
+    const onChange = React.useCallback(
+      (newValue: string) => {
+        setValue(newValue)
+        onValueChange?.(newValue)
+      },
+      [onValueChange]
+    )
+
+    const contextValue = React.useMemo(
+      () => ({
+        value: controlledValue !== undefined ? controlledValue : value,
+        onChange,
+      }),
+      [controlledValue, value, onChange]
+    )
+
+    return (
+      <TabsContext.Provider value={contextValue}>
+        <View ref={ref} style={[styles.container, style]}>
+          {children}
+        </View>
+      </TabsContext.Provider>
+    )
+  }
+)
+
+const TabsList = React.forwardRef<View, TabsListProps>(
+  ({ children, style }, ref) => (
+    <View ref={ref} style={[styles.list, style]}>
+      {children}
+    </View>
+  )
+)
+
+const TabsTrigger = React.forwardRef<TouchableOpacity, TabsTriggerProps>(
+  ({ value, children, style }, ref) => {
+    const { value: selectedValue, onChange } = React.useContext(TabsContext)
+    const isSelected = value === selectedValue
+
+    return (
+      <TouchableOpacity
+        ref={ref}
+        style={[
+          styles.trigger,
+          isSelected && styles.triggerSelected,
+          style,
+        ]}
+        onPress={() => onChange(value)}
+        activeOpacity={0.7}
+      >
+        <Text style={[
+          styles.triggerText,
+          isSelected && styles.triggerTextSelected,
+        ]}>
+          {children}
+        </Text>
+      </TouchableOpacity>
+    )
+  }
+)
+
+const TabsContent = React.forwardRef<View, TabsContentProps>(
+  ({ value, children, style }, ref) => {
+    const { value: selectedValue } = React.useContext(TabsContext)
+    const isSelected = value === selectedValue
+
+    if (!isSelected) return null
+
+    return (
+      <View ref={ref} style={[styles.content, style]}>
+        {children}
+      </View>
+    )
+  }
+)
+
+const styles = StyleSheet.create({
+  container: {
+    width: "100%",
+  },
+  list: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e5e5",
+  },
+  trigger: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  triggerSelected: {
+    borderBottomWidth: 2,
+    borderBottomColor: "#000",
+  },
+  triggerText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  triggerTextSelected: {
+    color: "#000",
+    fontWeight: "600",
+  },
+  content: {
+    padding: 16,
+  },
+})
+
+export {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+}

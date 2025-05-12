@@ -1,21 +1,12 @@
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, ViewStyle, TextStyle, ImageStyle } from 'react-native';
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { getUserData } from "@/lib/api";
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera, Loader2 } from "lucide-react";
+import { Camera, Save, RefreshCw } from "lucide-react-native";
 import { useToast } from "@/components/ui/use-toast";
+import { getUserData } from "@/lib/api";
+import * as ImagePicker from 'expo-image-picker';
 
 // Validation schema
 const profileSchema = z.object({
@@ -27,13 +18,60 @@ const profileSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
+interface FormFieldProps {
+    label: string;
+    value: string;
+    onChangeText: (text: string) => void;
+    placeholder?: string;
+    error?: string;
+    disabled?: boolean;
+}
+
+interface Styles {
+    container: ViewStyle;
+    avatarSection: ViewStyle;
+    avatarContainer: ViewStyle;
+    avatar: ViewStyle;
+    avatarImage: ImageStyle;
+    avatarFallback: ViewStyle;
+    avatarFallbackText: TextStyle;
+    cameraButton: ViewStyle;
+    profileInfo: ViewStyle;
+    title: TextStyle;
+    description: TextStyle;
+    form: ViewStyle;
+    formRow: ViewStyle;
+    formField: ViewStyle;
+    label: TextStyle;
+    input: TextStyle;
+    inputDisabled: TextStyle;
+    errorText: TextStyle;
+    button: ViewStyle;
+    buttonDisabled: ViewStyle;
+    buttonContent: ViewStyle;
+    buttonText: TextStyle;
+}
+
+const FormField = ({ label, value, onChangeText, placeholder, error, disabled }: FormFieldProps) => (
+    <View style={styles.formField}>
+        <Text style={styles.label}>{label}</Text>
+        <TextInput
+            style={[styles.input, disabled && styles.inputDisabled]}
+            value={value}
+            onChangeText={onChangeText}
+            placeholder={placeholder}
+            editable={!disabled}
+        />
+        {error && <Text style={styles.errorText}>{error}</Text>}
+    </View>
+);
+
 const ProfileSettings = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [avatarUrl, setAvatarUrl] = useState("");
     const { toast } = useToast();
 
-    // Initialize form with default values
-    const form = useForm<ProfileFormValues>({
+    const { control, handleSubmit, setValue, getValues } = useForm<ProfileFormValues>({
         resolver: zodResolver(profileSchema),
         defaultValues: {
             firstName: "",
@@ -43,36 +81,53 @@ const ProfileSettings = () => {
         },
     });
 
-    // Get user data
     useEffect(() => {
         const userData = getUserData();
         if (userData) {
-            form.reset({
-                firstName: userData.firstName,
-                lastName: userData.lastName,
-                email: userData.email,
-                profilePicture: userData.profilePicture || "",
-            });
+            setValue("firstName", userData.firstName);
+            setValue("lastName", userData.lastName);
+            setValue("email", userData.email);
+            setValue("profilePicture", userData.profilePicture || "");
 
             if (userData.profilePicture) {
                 setAvatarUrl(userData.profilePicture);
             }
         }
-    }, [form]);
+    }, [setValue]);
 
-    // Handle avatar change
-    const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            // For now, just create a local URL for preview
-            // In a real app, you would upload this to a server
-            const url = URL.createObjectURL(file);
-            setAvatarUrl(url);
-            form.setValue("profilePicture", url);
+    const handleAvatarChange = async () => {
+        try {
+            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+            if (!permissionResult.granted) {
+                toast({
+                    title: "Permission required",
+                    description: "Please grant camera roll permissions to change your profile picture.",
+                });
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
+
+            if (!result.canceled) {
+                const uri = result.assets[0].uri;
+                setAvatarUrl(uri);
+                setValue("profilePicture", uri);
+            }
+        } catch (error) {
+            console.error("Error picking image:", error);
+            toast({
+                title: "Error",
+                description: "Failed to pick image. Please try again.",
+            });
         }
     };
 
-    // Handle form submission
     const onSubmit = async (data: ProfileFormValues) => {
         setIsLoading(true);
         try {
@@ -100,7 +155,6 @@ const ProfileSettings = () => {
             toast({
                 title: "Update failed",
                 description: "There was an error updating your profile. Please try again.",
-                variant: "destructive",
             });
         } finally {
             setIsLoading(false);
@@ -108,97 +162,215 @@ const ProfileSettings = () => {
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row gap-8 items-start sm:items-center">
-                <div className="relative">
-                    <Avatar className="h-24 w-24">
+        <View style={styles.container}>
+            <View style={styles.avatarSection}>
+                <View style={styles.avatarContainer}>
+                    <View style={styles.avatar}>
                         {avatarUrl ? (
-                            <AvatarImage src={avatarUrl} alt="Profile picture" />
+                            <Image
+                                source={{ uri: avatarUrl }}
+                                style={styles.avatarImage}
+                            />
                         ) : (
-                            <AvatarFallback className="bg-budgetu-purple text-white text-2xl">
-                                {form.getValues("firstName").charAt(0)}
-                                {form.getValues("lastName").charAt(0)}
-                            </AvatarFallback>
+                            <View style={styles.avatarFallback}>
+                                <Text style={styles.avatarFallbackText}>
+                                    {getValues("firstName").charAt(0)}
+                                    {getValues("lastName").charAt(0)}
+                                </Text>
+                            </View>
                         )}
-                    </Avatar>
-                    <label
-                        htmlFor="avatar-upload"
-                        className="absolute bottom-0 right-0 p-1 bg-primary text-primary-foreground rounded-full cursor-pointer"
+                    </View>
+                    <TouchableOpacity
+                        style={styles.cameraButton}
+                        onPress={handleAvatarChange}
                     >
-                        <Camera className="h-4 w-4" />
-                        <input
-                            id="avatar-upload"
-                            type="file"
-                            accept="image/*"
-                            className="sr-only"
-                            onChange={handleAvatarChange}
-                        />
-                    </label>
-                </div>
-                <div>
-                    <h3 className="text-lg font-medium">Profile Picture</h3>
-                    <p className="text-sm text-muted-foreground">
-                        Click the camera icon to upload a new profile picture
-                    </p>
-                </div>
-            </div>
+                        <Camera size={16} color="#fff" />
+                    </TouchableOpacity>
+                </View>
+                <View style={styles.profileInfo}>
+                    <Text style={styles.title}>Profile Picture</Text>
+                    <Text style={styles.description}>
+                        Tap the camera icon to upload a new profile picture
+                    </Text>
+                </View>
+            </View>
 
-            <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <FormField
-                            control={form.control}
-                            name="firstName"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>First Name</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="John" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="lastName"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Last Name</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Doe" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </div>
-                    <FormField
-                        control={form.control}
-                        name="email"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Email</FormLabel>
-                                <FormControl>
-                                    <Input
-                                        placeholder="you@example.com"
-                                        {...field}
-                                        disabled
-                                        title="Email cannot be changed"
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
+            <View style={styles.form}>
+                <View style={styles.formRow}>
+                    <Controller
+                        control={control}
+                        name="firstName"
+                        render={({ field: { onChange, value }, fieldState: { error } }) => (
+                            <FormField
+                                label="First Name"
+                                value={value}
+                                onChangeText={onChange}
+                                placeholder="John"
+                                error={error?.message}
+                            />
                         )}
                     />
-                    <Button type="submit" disabled={isLoading}>
-                        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Save Changes
-                    </Button>
-                </form>
-            </Form>
-        </div>
+                    <Controller
+                        control={control}
+                        name="lastName"
+                        render={({ field: { onChange, value }, fieldState: { error } }) => (
+                            <FormField
+                                label="Last Name"
+                                value={value}
+                                onChangeText={onChange}
+                                placeholder="Doe"
+                                error={error?.message}
+                            />
+                        )}
+                    />
+                </View>
+                <Controller
+                    control={control}
+                    name="email"
+                    render={({ field: { onChange, value }, fieldState: { error } }) => (
+                        <FormField
+                            label="Email"
+                            value={value}
+                            onChangeText={onChange}
+                            placeholder="you@example.com"
+                            error={error?.message}
+                            disabled
+                        />
+                    )}
+                />
+
+                <TouchableOpacity
+                    onPress={handleSubmit(onSubmit)}
+                    disabled={isLoading}
+                    style={[styles.button, isLoading && styles.buttonDisabled]}
+                >
+                    <View style={styles.buttonContent}>
+                        {isLoading ? (
+                            <RefreshCw size={16} color="#fff" />
+                        ) : (
+                            <Save size={16} color="#fff" />
+                        )}
+                        <Text style={styles.buttonText}>Save Changes</Text>
+                    </View>
+                </TouchableOpacity>
+            </View>
+        </View>
     );
 };
+
+const styles = StyleSheet.create<Styles>({
+    container: {
+        gap: 24,
+    },
+    avatarSection: {
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 16,
+    },
+    avatarContainer: {
+        position: 'relative',
+    },
+    avatar: {
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        backgroundColor: '#f1f5f9',
+        overflow: 'hidden',
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+    },
+    avatarFallback: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#6366f1',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarFallbackText: {
+        color: '#fff',
+        fontSize: 24,
+        fontWeight: 'bold',
+    },
+    cameraButton: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        backgroundColor: '#0066cc',
+        padding: 8,
+        borderRadius: 16,
+    },
+    profileInfo: {
+        alignItems: 'center',
+    },
+    title: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#000',
+    },
+    description: {
+        fontSize: 14,
+        color: '#666',
+    },
+    form: {
+        gap: 16,
+    },
+    formRow: {
+        flexDirection: 'row',
+        gap: 16,
+    },
+    formField: {
+        flex: 1,
+        gap: 8,
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#000',
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        color: '#000',
+    },
+    inputDisabled: {
+        backgroundColor: '#f1f5f9',
+        color: '#64748b',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+    },
+    errorText: {
+        fontSize: 12,
+        color: '#dc2626',
+    },
+    button: {
+        backgroundColor: '#0066cc',
+        padding: 12,
+        borderRadius: 8,
+        marginTop: 8,
+    },
+    buttonDisabled: {
+        opacity: 0.5,
+    },
+    buttonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    buttonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+});
 
 export default ProfileSettings; 

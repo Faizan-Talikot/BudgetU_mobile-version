@@ -1,121 +1,109 @@
-BudgetU
-<div align="center">
-  <h3>Financial Freedom for College Students</h3>
-</div>
-📚 About
-BudgetU is a financial management platform designed specifically for college students. We help students set realistic monthly budgets, track expenses through bank integration, and make informed spending decisions in real-time. Our mission is to empower students to take control of their finances and develop healthy money habits that last a lifetime.
+# BudgetU Mobile App
 
-"Can I afford this burger right now?" - BudgetU has the answer.
+A React Native mobile application for managing personal finances, specifically designed for college students.
 
-✨ Features
-💰 Smart Budget Creation
+## Features
 
-Set up personalized monthly budgets in minutes
-Auto-allocate funds across essential and discretionary categories
-Choose from templates designed for different student situations
+- Smart budget creation and management
+- Bank account integration
+- Real-time financial guidance
+- Transaction tracking
+- Push notifications for budget alerts
+- Offline support
+- Weekly financial reports
 
-🏦 Bank Statement Integration
+## Tech Stack
 
-Securely connect your bank accounts
-Automatically categorize and track all transactions
-Get a holistic view of your spending habits
+- React Native with Expo
+- TypeScript
+- React Navigation
+- React Query
+- Expo Notifications
+- AsyncStorage for offline data
+- Custom theming system
 
-🛒 Real-Time Spending Guidance
+## Prerequisites
 
-Check if you can afford a purchase before making it
-Receive alternative spending suggestions
-Get alerts when approaching category limits
+- Node.js (v14 or higher)
+- npm or yarn
+- Expo CLI
+- iOS Simulator (for Mac users) or Android Studio (for Android development)
 
-📊 Financial Insights
+## Installation
 
-Visualize your spending patterns
-Track progress toward financial goals
-Forecast your end-of-month balance
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/budgetu-mobile.git
+cd budgetu-mobile
+```
 
-🚀 Getting Started
-Prerequisites
+2. Install dependencies:
+```bash
+yarn install
+```
 
-Node.js (v16+)
-npm or yarn
-MongoDB (local or Atlas connection)
-Supabase account (for authentication)
+3. Start the development server:
+```bash
+yarn start
+```
 
-Installation
+4. Run on your preferred platform:
+```bash
+# For iOS
+yarn ios
 
-Clone the repository
+# For Android
+yarn android
+```
 
-bashgit clone https://github.com/yourusername/budgetu.git
-cd budgetu
+## Environment Setup
 
-Install dependencies
+1. Create a `.env` file in the root directory:
+```env
+API_URL=your_api_url
+EXPO_PROJECT_ID=your_expo_project_id
+```
 
-bash# Install backend dependencies
-cd server
-npm install
+2. Configure your API endpoints in `src/config/env.ts`
 
-# Install frontend dependencies
-cd ../client
-npm install
+## Project Structure
 
-Set up environment variables
+```
+src/
+├── api/          # API client and endpoints
+├── components/   # Reusable UI components
+├── config/       # Configuration files
+├── contexts/     # React Context providers
+├── hooks/        # Custom React hooks
+├── navigation/   # Navigation configuration
+├── screens/      # App screens
+├── theme/        # Theme configuration
+└── utils/        # Utility functions
+```
 
-bash# In the server directory, create a .env file
-touch .env
+## Available Scripts
 
-# Add the following variables
-MONGODB_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
-PLAID_CLIENT_ID=your_plaid_client_id
-PLAID_SECRET=your_plaid_secret
+- `yarn start`: Start the Expo development server
+- `yarn ios`: Run on iOS simulator
+- `yarn android`: Run on Android emulator
+- `yarn web`: Run in web browser
+- `yarn lint`: Run ESLint
+- `yarn type-check`: Run TypeScript type checking
 
-Start the development servers
+## Contributing
 
-bash# Start backend server
-cd server
-npm run dev
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-# In a new terminal, start frontend
-cd client
-npm start
+## License
 
-Visit http://localhost:3000 to see the application running
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-🧰 Tech Stack
-Frontend
+## Acknowledgments
 
-React.js
-Redux for state management
-Material UI components
-Chart.js for data visualization
-Progressive Web App capabilities
-
-Backend
-
-Node.js with Express
-MongoDB for database
-Supabase for authentication
-Plaid API for bank integration
-JWT for secure communication
-
-Infrastructure
-
-AWS for cloud hosting
-CI/CD with GitHub Actions
-MongoDB Atlas for database hosting
-
-Fork the repository
-Create a feature branch (git checkout -b feature/amazing-feature)
-Commit your changes (git commit -m 'Add some amazing feature')
-Push to the branch (git push origin feature/amazing-feature)
-Open a Pull Request
-
-📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
-🙏 Acknowledgements
-
-<div align="center">
-  <p>Made with ❤️ for students, by students</p>
-  <p>© 2025 BudgetU Team</p>
-</div>
+- Thanks to all contributors
+- Built with [Expo](https://expo.dev/)
+- UI/UX inspiration from various financial apps

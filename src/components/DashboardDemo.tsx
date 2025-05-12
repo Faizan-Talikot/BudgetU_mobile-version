@@ -1,16 +1,16 @@
-
+import { View, Text, StyleSheet, Dimensions } from "react-native";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { PieChart } from "react-native-chart-kit";
 
 const DashboardDemo = () => {
   // Sample data for the charts
   const spendingData = [
-    { name: "Housing", value: 500, color: "#9b87f5" },
-    { name: "Food", value: 300, color: "#8B5CF6" },
-    { name: "Entertainment", value: 150, color: "#F97316" },
-    { name: "Transport", value: 100, color: "#D6BCFA" },
-    { name: "Other", value: 100, color: "#D3E4FD" },
+    { name: "Housing", value: 500, color: "#9b87f5", legendFontColor: "#7F7F7F" },
+    { name: "Food", value: 300, color: "#8B5CF6", legendFontColor: "#7F7F7F" },
+    { name: "Entertainment", value: 150, color: "#F97316", legendFontColor: "#7F7F7F" },
+    { name: "Transport", value: 100, color: "#D6BCFA", legendFontColor: "#7F7F7F" },
+    { name: "Other", value: 100, color: "#D3E4FD", legendFontColor: "#7F7F7F" },
   ];
 
   const categoryBudgets = [
@@ -27,116 +27,257 @@ const DashboardDemo = () => {
   const daysInMonth = 30;
   const currentDay = 21;
   const daysLeft = daysInMonth - currentDay;
-  
+
   const safeToSpendDaily = Math.round((totalBudget - totalSpent) / daysLeft);
 
-  return (
-    <section className="py-20 bg-secondary/50">
-      <div className="budgetu-container">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Your Financial Dashboard, <span className="text-gradient">Simplified</span>
-          </h2>
-          <p className="text-lg text-muted-foreground">
-            Get a clear view of your finances with intuitive visualizations and actionable insights.
-          </p>
-        </div>
+  const chartConfig = {
+    backgroundGradientFrom: "#fff",
+    backgroundGradientTo: "#fff",
+    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+  };
 
-        <div className="bg-background p-4 md:p-8 rounded-3xl border shadow-lg max-w-4xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+  return (
+    <View style={styles.section}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>
+            Your Financial Dashboard, <Text style={styles.gradient}>Simplified</Text>
+          </Text>
+          <Text style={styles.subtitle}>
+            Get a clear view of your finances with intuitive visualizations and actionable insights.
+          </Text>
+        </View>
+
+        <View style={styles.dashboard}>
+          <View style={styles.grid}>
             {/* Safe-to-Spend Card */}
-            <Card className="col-span-full md:col-span-5 bg-gradient-to-br from-budgetu-purple to-budgetu-vivid-purple text-white">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-medium mb-4">Safe to Spend</h3>
-                <div className="text-5xl font-bold mb-2">${safeToSpendDaily}</div>
-                <p className="text-sm opacity-80">per day for the next {daysLeft} days</p>
-                <div className="mt-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Monthly Budget</span>
-                    <span>${totalBudget}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Spent So Far</span>
-                    <span>${totalSpent}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-semibold">
-                    <span>Remaining</span>
-                    <span>${totalBudget - totalSpent}</span>
-                  </div>
-                </div>
+            <Card style={styles.safeToSpendCard}>
+              <CardContent style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Safe to Spend</Text>
+                <Text style={styles.amount}>${safeToSpendDaily}</Text>
+                <Text style={styles.period}>per day for the next {daysLeft} days</Text>
+                <View style={styles.stats}>
+                  <View style={styles.statRow}>
+                    <Text style={styles.statLabel}>Monthly Budget</Text>
+                    <Text style={styles.statValue}>${totalBudget}</Text>
+                  </View>
+                  <View style={styles.statRow}>
+                    <Text style={styles.statLabel}>Spent So Far</Text>
+                    <Text style={styles.statValue}>${totalSpent}</Text>
+                  </View>
+                  <View style={styles.statRow}>
+                    <Text style={[styles.statLabel, styles.bold]}>Remaining</Text>
+                    <Text style={[styles.statValue, styles.bold]}>${totalBudget - totalSpent}</Text>
+                  </View>
+                </View>
               </CardContent>
             </Card>
 
             {/* Spending Breakdown Chart */}
-            <Card className="col-span-full md:col-span-7">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-medium mb-4">Spending Breakdown</h3>
-                <div className="flex items-center justify-between">
-                  <div className="w-32 h-32">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={spendingData}
-                          innerRadius={25}
-                          outerRadius={50}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {spendingData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="space-y-2">
-                    {spendingData.map((item, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: item.color }}
-                        ></div>
-                        <span className="text-sm">
-                          {item.name}: ${item.value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            <Card style={styles.chartCard}>
+              <CardContent style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Spending Breakdown</Text>
+                <View style={styles.chartContainer}>
+                  <View style={styles.pieChart}>
+                    <PieChart
+                      data={spendingData.map(item => ({
+                        name: item.name,
+                        population: item.value,
+                        color: item.color,
+                        legendFontColor: item.legendFontColor,
+                        legendFontSize: 12,
+                      }))}
+                      width={Dimensions.get("window").width - 32}
+                      height={220}
+                      chartConfig={chartConfig}
+                      accessor="population"
+                      backgroundColor="transparent"
+                      paddingLeft="0"
+                      absolute
+                    />
+                  </View>
+                </View>
               </CardContent>
             </Card>
 
             {/* Category Budgets */}
-            <Card className="col-span-full">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-medium mb-4">Category Budgets</h3>
-                <div className="space-y-4">
+            <Card style={styles.budgetsCard}>
+              <CardContent style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Category Budgets</Text>
+                <View style={styles.budgetsList}>
                   {categoryBudgets.map((item, index) => (
-                    <div key={index}>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm font-medium">{item.category}</span>
-                        <span className="text-sm text-muted-foreground">
+                    <View key={index} style={styles.budgetItem}>
+                      <View style={styles.budgetHeader}>
+                        <Text style={styles.budgetCategory}>{item.category}</Text>
+                        <Text style={styles.budgetAmount}>
                           ${item.spent} / ${item.total}
-                        </span>
-                      </div>
-                      <Progress 
-                        value={item.percentage} 
-                        className={`h-2 ${
-                          item.percentage > 90 ? "bg-red-200" : 
-                          item.percentage > 75 ? "bg-amber-200" : 
-                          "bg-green-200"
-                        }`} 
+                        </Text>
+                      </View>
+                      <Progress
+                        value={item.percentage}
+                        style={[
+                          styles.budgetProgress,
+                          item.percentage > 90 ? styles.redProgress :
+                            item.percentage > 75 ? styles.amberProgress :
+                              styles.greenProgress
+                        ]}
                       />
-                    </div>
+                    </View>
                   ))}
-                </div>
+                </View>
               </CardContent>
             </Card>
-          </div>
-        </div>
-      </div>
-    </section>
+          </View>
+        </View>
+      </View>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  section: {
+    paddingVertical: 80,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  container: {
+    paddingHorizontal: 16,
+  },
+  header: {
+    maxWidth: 768,
+    alignSelf: 'center',
+    alignItems: 'center',
+    marginBottom: 64,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  gradient: {
+    color: '#8B5CF6',
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+  },
+  dashboard: {
+    backgroundColor: '#fff',
+    padding: 32,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+    maxWidth: 1024,
+    alignSelf: 'center',
+  },
+  grid: {
+    gap: 24,
+  },
+  safeToSpendCard: {
+    backgroundColor: '#8B5CF6',
+  },
+  chartCard: {
+    flex: 1,
+  },
+  budgetsCard: {
+    width: '100%',
+  },
+  cardContent: {
+    padding: 24,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+    marginBottom: 16,
+    color: '#fff',
+  },
+  amount: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  period: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  stats: {
+    marginTop: 16,
+    gap: 8,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  statValue: {
+    fontSize: 14,
+    color: '#fff',
+  },
+  bold: {
+    fontWeight: '600',
+  },
+  chartContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pieChart: {
+    width: 128,
+    height: 128,
+  },
+  legend: {
+    gap: 8,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  budgetsList: {
+    gap: 16,
+  },
+  budgetItem: {
+    gap: 4,
+  },
+  budgetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  budgetCategory: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  budgetAmount: {
+    fontSize: 14,
+    color: '#666',
+  },
+  budgetProgress: {
+    height: 8,
+  },
+  redProgress: {
+    backgroundColor: '#fecaca',
+  },
+  amberProgress: {
+    backgroundColor: '#fde68a',
+  },
+  greenProgress: {
+    backgroundColor: '#bbf7d0',
+  },
+});
 
 export default DashboardDemo;

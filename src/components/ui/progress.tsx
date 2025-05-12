@@ -1,26 +1,52 @@
 import * as React from "react"
-import * as ProgressPrimitive from "@radix-ui/react-progress"
+import { View, StyleSheet, ViewStyle, StyleProp, Animated } from "react-native"
 
-import { cn } from "@/lib/utils"
+interface ProgressProps {
+  value?: number
+  style?: StyleProp<ViewStyle>
+}
 
-const Progress = React.forwardRef<
-  React.ElementRef<typeof ProgressPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>
->(({ className, value, ...props }, ref) => (
-  <ProgressPrimitive.Root
-    ref={ref}
-    className={cn(
-      "relative h-4 w-full overflow-hidden rounded-full bg-secondary",
-      className
-    )}
-    {...props}
-  >
-    <ProgressPrimitive.Indicator
-      className="h-full w-full flex-1 bg-primary transition-all"
-      style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
-    />
-  </ProgressPrimitive.Root>
-))
-Progress.displayName = ProgressPrimitive.Root.displayName
+const Progress = React.forwardRef<View, ProgressProps>(
+  ({ value = 0, style }, ref) => {
+    const progressAnim = React.useRef(new Animated.Value(0)).current
+
+    React.useEffect(() => {
+      Animated.timing(progressAnim, {
+        toValue: value,
+        duration: 300,
+        useNativeDriver: false,
+      }).start()
+    }, [value, progressAnim])
+
+    return (
+      <View ref={ref} style={[styles.container, style]}>
+        <Animated.View
+          style={[
+            styles.indicator,
+            {
+              width: progressAnim.interpolate({
+                inputRange: [0, 100],
+                outputRange: ["0%", "100%"],
+              }),
+            },
+          ]}
+        />
+      </View>
+    )
+  }
+)
+
+const styles = StyleSheet.create({
+  container: {
+    height: 16,
+    backgroundColor: "#f4f4f5",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  indicator: {
+    height: "100%",
+    backgroundColor: "#000",
+  },
+})
 
 export { Progress }

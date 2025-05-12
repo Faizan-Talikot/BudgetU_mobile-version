@@ -1,48 +1,143 @@
-import * as React from "react"
-import * as AvatarPrimitive from "@radix-ui/react-avatar"
+import React, { useState } from 'react';
+import {
+  View,
+  Image,
+  Text,
+  StyleSheet,
+  ViewStyle,
+  ImageStyle,
+  TextStyle,
+  ImageSourcePropType,
+  ImageErrorEventData,
+  NativeSyntheticEvent,
+} from 'react-native';
 
-import { cn } from "@/lib/utils"
+interface AvatarProps {
+  style?: ViewStyle;
+  children: React.ReactNode;
+}
 
-const Avatar = React.forwardRef<
-  React.ElementRef<typeof AvatarPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>
->(({ className, ...props }, ref) => (
-  <AvatarPrimitive.Root
-    ref={ref}
-    className={cn(
-      "relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full",
-      className
-    )}
-    {...props}
-  />
-))
-Avatar.displayName = AvatarPrimitive.Root.displayName
+interface AvatarImageProps {
+  source: ImageSourcePropType;
+  alt?: string;
+  style?: ImageStyle;
+  onError?: (error: NativeSyntheticEvent<ImageErrorEventData>) => void;
+}
 
-const AvatarImage = React.forwardRef<
-  React.ElementRef<typeof AvatarPrimitive.Image>,
-  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>
->(({ className, ...props }, ref) => (
-  <AvatarPrimitive.Image
-    ref={ref}
-    className={cn("aspect-square h-full w-full", className)}
-    {...props}
-  />
-))
-AvatarImage.displayName = AvatarPrimitive.Image.displayName
+interface AvatarFallbackProps {
+  style?: ViewStyle;
+  children: React.ReactNode;
+  delayMs?: number;
+}
 
-const AvatarFallback = React.forwardRef<
-  React.ElementRef<typeof AvatarPrimitive.Fallback>,
-  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>
->(({ className, ...props }, ref) => (
-  <AvatarPrimitive.Fallback
-    ref={ref}
-    className={cn(
-      "flex h-full w-full items-center justify-center rounded-full bg-muted",
-      className
-    )}
-    {...props}
-  />
-))
-AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName
+const Avatar: React.FC<AvatarProps> = ({
+  style,
+  children,
+}) => {
+  return (
+    <View style={[styles.avatar, style]}>
+      {children}
+    </View>
+  );
+};
 
-export { Avatar, AvatarImage, AvatarFallback }
+const AvatarImage: React.FC<AvatarImageProps> = ({
+  source,
+  alt,
+  style,
+  onError,
+}) => {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return null;
+  }
+
+  return (
+    <Image
+      source={source}
+      accessibilityLabel={alt}
+      style={[styles.image, style]}
+      onError={(e) => {
+        setHasError(true);
+        onError?.(e);
+      }}
+    />
+  );
+};
+
+const AvatarFallback: React.FC<AvatarFallbackProps> = ({
+  children,
+  style,
+  delayMs = 600,
+}) => {
+  const [shouldShow, setShouldShow] = useState(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setShouldShow(true);
+    }, delayMs);
+
+    return () => clearTimeout(timer);
+  }, [delayMs]);
+
+  if (!shouldShow) {
+    return null;
+  }
+
+  return (
+    <View style={[styles.fallback, style]}>
+      {typeof children === 'string' ? (
+        <Text style={styles.fallbackText}>{children}</Text>
+      ) : (
+        children
+      )}
+    </View>
+  );
+};
+
+interface Styles {
+  avatar: ViewStyle;
+  image: ImageStyle;
+  fallback: ViewStyle;
+  fallbackText: TextStyle;
+}
+
+const styles = StyleSheet.create<Styles>({
+  avatar: {
+    position: 'relative',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  fallback: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#e2e8f0',
+  },
+  fallbackText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#64748b',
+  },
+});
+
+Avatar.displayName = 'Avatar';
+AvatarImage.displayName = 'AvatarImage';
+AvatarFallback.displayName = 'AvatarFallback';
+
+export { Avatar, AvatarImage, AvatarFallback };

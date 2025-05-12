@@ -1,56 +1,152 @@
-import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
+import React from 'react';
+import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle, TouchableOpacityProps } from 'react-native';
 
-import { cn } from "@/lib/utils"
-
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-)
-
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
-  asChild?: boolean
+export interface ButtonProps extends TouchableOpacityProps {
+  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+  size?: 'default' | 'sm' | 'lg' | 'icon';
+  children: React.ReactNode;
 }
 
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
-    return (
-      <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
-        ref={ref}
-        {...props}
-      />
-    )
-  }
-)
-Button.displayName = "Button"
+interface Styles {
+  button: ViewStyle;
+  buttonText: TextStyle;
+  // Variants
+  default: ViewStyle;
+  destructive: ViewStyle;
+  outline: ViewStyle;
+  secondary: ViewStyle;
+  ghost: ViewStyle;
+  link: ViewStyle;
+  // Sizes
+  sizeDefault: ViewStyle;
+  sizeSm: ViewStyle;
+  sizeLg: ViewStyle;
+  sizeIcon: ViewStyle;
+  // Text variants
+  defaultText: TextStyle;
+  destructiveText: TextStyle;
+  outlineText: TextStyle;
+  secondaryText: TextStyle;
+  ghostText: TextStyle;
+  linkText: TextStyle;
+}
 
-export { Button, buttonVariants }
+const sizeMap = {
+  default: 'sizeDefault',
+  sm: 'sizeSm',
+  lg: 'sizeLg',
+  icon: 'sizeIcon',
+} as const;
+
+const Button = React.forwardRef<TouchableOpacity, ButtonProps>(
+  ({ variant = 'default', size = 'default', style, children, disabled, ...props }, ref) => {
+    const getVariantStyle = () => {
+      return [
+        styles.button,
+        styles[variant],
+        styles[sizeMap[size]],
+        disabled && { opacity: 0.5 },
+        style,
+      ];
+    };
+
+    const getTextStyle = () => {
+      return [styles.buttonText, styles[`${variant}Text`]];
+    };
+
+    return (
+      <TouchableOpacity
+        ref={ref}
+        style={getVariantStyle()}
+        disabled={disabled}
+        {...props}
+      >
+        {typeof children === 'string' ? (
+          <Text style={getTextStyle()}>{children}</Text>
+        ) : (
+          children
+        )}
+      </TouchableOpacity>
+    );
+  }
+);
+
+const styles = StyleSheet.create<Styles>({
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    gap: 8,
+  },
+  buttonText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  // Variants
+  default: {
+    backgroundColor: '#0066cc',
+  },
+  destructive: {
+    backgroundColor: '#dc2626',
+  },
+  outline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  secondary: {
+    backgroundColor: '#f1f5f9',
+  },
+  ghost: {
+    backgroundColor: 'transparent',
+  },
+  link: {
+    backgroundColor: 'transparent',
+  },
+  // Sizes
+  sizeDefault: {
+    height: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  sizeSm: {
+    height: 36,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  sizeLg: {
+    height: 44,
+    paddingHorizontal: 32,
+    paddingVertical: 10,
+  },
+  sizeIcon: {
+    height: 40,
+    width: 40,
+    padding: 8,
+  },
+  // Text variants
+  defaultText: {
+    color: '#fff',
+  },
+  destructiveText: {
+    color: '#fff',
+  },
+  outlineText: {
+    color: '#000',
+  },
+  secondaryText: {
+    color: '#000',
+  },
+  ghostText: {
+    color: '#000',
+  },
+  linkText: {
+    color: '#0066cc',
+    textDecorationLine: 'underline',
+  },
+});
+
+Button.displayName = 'Button';
+
+export { Button };

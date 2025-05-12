@@ -1,29 +1,172 @@
 import * as React from "react"
-import * as PopoverPrimitive from "@radix-ui/react-popover"
+import {
+  View,
+  Modal,
+  TouchableOpacity,
+  StyleSheet,
+  ViewStyle,
+  StyleProp,
+  Dimensions,
+  Platform,
+  Animated,
+} from "react-native"
 
-import { cn } from "@/lib/utils"
+interface PopoverProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
 
-const Popover = PopoverPrimitive.Root
+interface PopoverTriggerProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  onPress?: () => void
+}
 
-const PopoverTrigger = PopoverPrimitive.Trigger
+interface PopoverContentProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  visible?: boolean
+  onClose?: () => void
+  fadeAnim?: Animated.Value
+  scaleAnim?: Animated.Value
+}
 
-const PopoverContent = React.forwardRef<
-  React.ElementRef<typeof PopoverPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
-  <PopoverPrimitive.Portal>
-    <PopoverPrimitive.Content
+const Popover = React.forwardRef<View, PopoverProps>(
+  ({ children, style }, ref) => {
+    const [visible, setVisible] = React.useState(false)
+    const fadeAnim = React.useRef(new Animated.Value(0)).current
+    const scaleAnim = React.useRef(new Animated.Value(0.95)).current
+
+    const handleOpen = () => {
+      setVisible(true)
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+      ]).start()
+    }
+
+    const handleClose = () => {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 0.95,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setVisible(false)
+      })
+    }
+
+    return (
+      <View ref={ref} style={style}>
+        {React.Children.map(children, (child) => {
+          if (!React.isValidElement(child)) return null
+
+          if (child.type === PopoverTrigger) {
+            return React.cloneElement(child as React.ReactElement<PopoverTriggerProps>, {
+              onPress: handleOpen,
+            })
+          }
+
+          if (child.type === PopoverContent) {
+            return React.cloneElement(child as React.ReactElement<PopoverContentProps>, {
+              visible,
+              onClose: handleClose,
+              fadeAnim,
+              scaleAnim,
+            })
+          }
+
+          return child
+        })}
+      </View>
+    )
+  }
+)
+
+const PopoverTrigger = React.forwardRef<TouchableOpacity, PopoverTriggerProps>(
+  ({ children, style, onPress }, ref) => (
+    <TouchableOpacity
       ref={ref}
-      align={align}
-      sideOffset={sideOffset}
-      className={cn(
-        "z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-        className
-      )}
-      {...props}
-    />
-  </PopoverPrimitive.Portal>
-))
-PopoverContent.displayName = PopoverPrimitive.Content.displayName
+      style={style}
+      onPress={onPress}
+    >
+      {children}
+    </TouchableOpacity>
+  )
+)
+
+const PopoverContent = React.forwardRef<View, PopoverContentProps>(
+  ({ children, style, visible, onClose, fadeAnim, scaleAnim }, ref) => {
+    if (!visible) return null
+
+    return (
+      <Modal
+        visible={visible}
+        transparent
+        animationType="none"
+        onRequestClose={onClose}
+      >
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={onClose}
+        >
+          <Animated.View
+            ref={ref}
+            style={[
+              styles.content,
+              {
+                opacity: fadeAnim,
+                transform: [{ scale: scaleAnim || new Animated.Value(1) }],
+              },
+              style,
+            ]}
+          >
+            {children}
+          </Animated.View>
+        </TouchableOpacity>
+      </Modal>
+    )
+  }
+)
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.25)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  content: {
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    padding: 16,
+    width: "80%",
+    maxWidth: 400,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  },
+})
 
 export { Popover, PopoverTrigger, PopoverContent }

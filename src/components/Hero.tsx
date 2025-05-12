@@ -1,69 +1,148 @@
+import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ArrowRight } from "lucide-react-native";
 
 type HeroProps = {
   openSignupDialog: () => void;
 };
 
 const Hero = ({ openSignupDialog }: HeroProps) => {
-  const navigate = useNavigate();
-
   const handleHowItWorks = () => {
-    // Scroll to the How It Works section
-    const howItWorksSection = document.getElementById("how-it-works");
-    if (howItWorksSection) {
-      howItWorksSection.scrollIntoView({ behavior: "smooth" });
-    }
+    // In React Native, we'll handle this differently
+    // You might want to use scrollTo with a ref or navigation
   };
 
   return (
-    <section className="py-20 md:py-28">
-      <div className="budgetu-container">
-        <div className="flex flex-col md:flex-row items-center gap-12">
-          <div className="flex-1 text-center md:text-left">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
-              Never Run Out of Money <span className="text-gradient">Before Month-End</span> Again
-            </h1>
-            <p className="text-xl text-muted-foreground mb-8">
+    <View style={styles.section}>
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <View style={styles.textContent}>
+            <Text style={styles.title}>
+              Never Run Out of Money{'\n'}
+              <Text style={styles.gradient}>Before Month-End</Text> Again
+            </Text>
+            <Text style={styles.subtitle}>
               BudgetU helps college students take control of their finances with smart budgeting,
               expense tracking, and real-time spending guidance.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
+            </Text>
+            <View style={styles.buttonContainer}>
               <Button
-                size="lg"
-                className="bg-budgetu-orange hover:bg-budgetu-orange/90"
-                onClick={openSignupDialog}
+                onPress={openSignupDialog}
+                style={styles.primaryButton}
               >
-                Start Budgeting <ArrowRight className="ml-2 h-4 w-4" />
+                <View style={styles.buttonContent}>
+                  <Text style={styles.buttonText}>Start Budgeting</Text>
+                  <ArrowRight size={16} color="#fff" style={styles.buttonIcon} />
+                </View>
               </Button>
               <Button
-                size="lg"
                 variant="outline"
-                onClick={handleHowItWorks}
+                onPress={handleHowItWorks}
+                style={styles.secondaryButton}
               >
-                See How It Works
+                <Text style={styles.secondaryButtonText}>See How It Works</Text>
               </Button>
-            </div>
-            <p className="text-sm text-muted-foreground mt-4">
+            </View>
+            <Text style={styles.disclaimer}>
               No credit card required. Free plan available.
-            </p>
-          </div>
-          <div className="flex-1 relative">
-            <div className="bg-gradient-to-br from-budgetu-purple/30 to-budgetu-light-purple/30 rounded-3xl p-8 relative overflow-hidden">
-              <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-budgetu-purple/20 blur-2xl"></div>
-              <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-budgetu-light-purple/20 blur-2xl"></div>
-              <img
-                src="https://images.unsplash.com/photo-1649972904349-6e44c42644a7?auto=format&fit=crop&q=80&w=800&ixlib=rb-4.0.3"
-                alt="Student using BudgetU app"
-                className="rounded-xl shadow-lg animate-float"
+            </Text>
+          </View>
+          <View style={styles.imageContainer}>
+            <View style={styles.gradientBackground}>
+              <Image
+                source={{ uri: "https://images.unsplash.com/photo-1649972904349-6e44c42644a7?auto=format&fit=crop&q=80&w=800&ixlib=rb-4.0.3" }}
+                style={styles.image}
+                resizeMode="cover"
               />
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+            </View>
+          </View>
+        </View>
+      </View>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  section: {
+    paddingVertical: 80,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  container: {
+    paddingHorizontal: 16,
+  },
+  content: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 48,
+  },
+  textContent: {
+    alignItems: 'center',
+    maxWidth: 768,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  gradient: {
+    color: '#8B5CF6',
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 16,
+  },
+  primaryButton: {
+    backgroundColor: '#F97316',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonIcon: {
+    marginLeft: 8,
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+  },
+  secondaryButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  disclaimer: {
+    fontSize: 14,
+    color: '#666',
+  },
+  imageContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  gradientBackground: {
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    borderRadius: 24,
+    padding: 32,
+    overflow: 'hidden',
+  },
+  image: {
+    width: '100%',
+    height: 400,
+    borderRadius: 12,
+  },
+});
 
 export default Hero;

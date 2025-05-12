@@ -1,22 +1,42 @@
-import * as React from "react"
+import React from 'react';
+import { TextInput, StyleSheet, TextStyle, TextInputProps } from 'react-native';
 
-import { cn } from "@/lib/utils"
+interface InputProps extends TextInputProps {
+  style?: TextStyle;
+}
 
-const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+interface Styles {
+  input: TextStyle;
+}
+
+const Input = React.forwardRef<TextInput, InputProps>(
+  ({ style, ...props }, ref) => {
     return (
-      <input
-        type={type}
-        className={cn(
-          "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-          className
-        )}
+      <TextInput
         ref={ref}
+        style={[styles.input, style]}
+        placeholderTextColor="#666"
         {...props}
       />
-    )
+    );
   }
-)
-Input.displayName = "Input"
+);
 
-export { Input }
+const styles = StyleSheet.create<Styles>({
+  input: {
+    height: 40,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    backgroundColor: '#fff',
+    color: '#000',
+  },
+});
+
+Input.displayName = 'Input';
+
+export { Input };

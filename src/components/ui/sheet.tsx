@@ -1,131 +1,232 @@
-import * as SheetPrimitive from "@radix-ui/react-dialog"
-import { cva, type VariantProps } from "class-variance-authority"
-import { X } from "lucide-react"
 import * as React from "react"
+import {
+  View,
+  Modal,
+  TouchableOpacity,
+  StyleSheet,
+  ViewStyle,
+  StyleProp,
+  Animated,
+  Dimensions,
+  Text,
+  Platform,
+} from "react-native"
+import { Feather } from "@expo/vector-icons"
 
-import { cn } from "@/lib/utils"
+interface SheetProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
 
-const Sheet = SheetPrimitive.Root
+interface SheetTriggerProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  onPress?: () => void
+}
 
-const SheetTrigger = SheetPrimitive.Trigger
+interface SheetContentProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  visible?: boolean
+  onClose?: () => void
+  side?: "top" | "bottom" | "left" | "right"
+  slideAnim?: Animated.Value
+}
 
-const SheetClose = SheetPrimitive.Close
+const Sheet = React.forwardRef<View, SheetProps>(
+  ({ children, style }, ref) => {
+    const [visible, setVisible] = React.useState(false)
+    const slideAnim = React.useRef(new Animated.Value(0)).current
 
-const SheetPortal = SheetPrimitive.Portal
+    const handleOpen = () => {
+      setVisible(true)
+      Animated.spring(slideAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+      }).start()
+    }
 
-const SheetOverlay = React.forwardRef<
-  React.ElementRef<typeof SheetPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <SheetPrimitive.Overlay
-    className={cn(
-      "fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-      className
-    )}
-    {...props}
-    ref={ref}
-  />
-))
-SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
+    const handleClose = () => {
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+      }).start(() => {
+        setVisible(false)
+      })
+    }
 
-const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
-  {
-    variants: {
-      side: {
-        top: "inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
-        bottom:
-          "inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-        left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
-        right:
-          "inset-y-0 right-0 h-full w-3/4  border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
-      },
-    },
-    defaultVariants: {
-      side: "right",
-    },
+    return (
+      <View ref={ref} style={style}>
+        {React.Children.map(children, (child) => {
+          if (!React.isValidElement(child)) return null
+
+          if (child.type === SheetTrigger) {
+            return React.cloneElement(child as React.ReactElement<SheetTriggerProps>, {
+              onPress: handleOpen,
+            })
+          }
+
+          if (child.type === SheetContent) {
+            return React.cloneElement(child as React.ReactElement<SheetContentProps>, {
+              visible,
+              onClose: handleClose,
+              slideAnim,
+            })
+          }
+
+          return child
+        })}
+      </View>
+    )
   }
 )
 
-interface SheetContentProps
-  extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-  VariantProps<typeof sheetVariants> { }
-
-const SheetContent = React.forwardRef<
-  React.ElementRef<typeof SheetPrimitive.Content>,
-  SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
-  <SheetPortal>
-    <SheetOverlay />
-    <SheetPrimitive.Content
+const SheetTrigger = React.forwardRef<TouchableOpacity, SheetTriggerProps>(
+  ({ children, style, onPress }, ref) => (
+    <TouchableOpacity
       ref={ref}
-      className={cn(sheetVariants({ side }), className)}
-      {...props}
+      style={style}
+      onPress={onPress}
     >
       {children}
-      <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </SheetPrimitive.Close>
-    </SheetPrimitive.Content>
-  </SheetPortal>
-))
-SheetContent.displayName = SheetPrimitive.Content.displayName
-
-const SheetHeader = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn(
-      "flex flex-col space-y-2 text-center sm:text-left",
-      className
-    )}
-    {...props}
-  />
+    </TouchableOpacity>
+  )
 )
-SheetHeader.displayName = "SheetHeader"
 
-const SheetFooter = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn(
-      "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
-      className
-    )}
-    {...props}
-  />
+const SheetContent = React.forwardRef<View, SheetContentProps & { slideAnim?: Animated.Value }>(
+  ({ children, style, visible, onClose, side = "right", slideAnim }, ref) => {
+    if (!visible) return null
+
+    const { width, height } = Dimensions.get("window")
+    const isVertical = side === "top" || side === "bottom"
+    const dimension = isVertical ? height : width
+
+    const getTransform = () => {
+      if (!slideAnim) return []
+
+      const translateValue = slideAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [dimension, 0],
+      })
+
+      switch (side) {
+        case "top":
+          return [{ translateY: translateValue }]
+        case "bottom":
+          return [{ translateY: translateValue }]
+        case "left":
+          return [{ translateX: translateValue }]
+        case "right":
+          return [{ translateX: translateValue }]
+        default:
+          return []
+      }
+    }
+
+    return (
+      <Modal
+        visible={visible}
+        transparent
+        animationType="none"
+        onRequestClose={onClose}
+      >
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={onClose}
+        >
+          <Animated.View
+            ref={ref}
+            style={[
+              styles.content,
+              side === "top" && styles.contentTop,
+              side === "bottom" && styles.contentBottom,
+              side === "left" && styles.contentLeft,
+              side === "right" && styles.contentRight,
+              {
+                transform: getTransform(),
+              },
+              style,
+            ]}
+          >
+            {children}
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={onClose}
+            >
+              <Feather name="x" size={24} color="#000" />
+            </TouchableOpacity>
+          </Animated.View>
+        </TouchableOpacity>
+      </Modal>
+    )
+  }
 )
-SheetFooter.displayName = "SheetFooter"
 
-const SheetTitle = React.forwardRef<
-  React.ElementRef<typeof SheetPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof SheetPrimitive.Title>
->(({ className, ...props }, ref) => (
-  <SheetPrimitive.Title
-    ref={ref}
-    className={cn("text-lg font-semibold text-foreground", className)}
-    {...props}
-  />
-))
-SheetTitle.displayName = SheetPrimitive.Title.displayName
-
-const SheetDescription = React.forwardRef<
-  React.ElementRef<typeof SheetPrimitive.Description>,
-  React.ComponentPropsWithoutRef<typeof SheetPrimitive.Description>
->(({ className, ...props }, ref) => (
-  <SheetPrimitive.Description
-    ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
-    {...props}
-  />
-))
-SheetDescription.displayName = SheetPrimitive.Description.displayName
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  content: {
+    position: "absolute",
+    backgroundColor: "#fff",
+    padding: 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  },
+  contentTop: {
+    top: 0,
+    left: 0,
+    right: 0,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+  contentBottom: {
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  contentLeft: {
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: "75%",
+    maxWidth: 400,
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+  contentRight: {
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: "75%",
+    maxWidth: 400,
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
+  },
+  closeButton: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    padding: 8,
+  },
+})
 
 export {
-  Sheet, SheetClose,
-  SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetOverlay, SheetPortal, SheetTitle, SheetTrigger
+  Sheet,
+  SheetTrigger,
+  SheetContent,
 }
 

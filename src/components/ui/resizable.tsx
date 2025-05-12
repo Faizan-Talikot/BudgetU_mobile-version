@@ -1,43 +1,110 @@
-import { GripVertical } from "lucide-react"
-import * as ResizablePrimitive from "react-resizable-panels"
+import * as React from "react"
+import {
+  View,
+  PanResponder,
+  StyleSheet,
+  ViewStyle,
+  StyleProp,
+  Animated,
+  LayoutChangeEvent,
+  PanResponderGestureState,
+} from "react-native"
+import { Feather } from "@expo/vector-icons"
 
-import { cn } from "@/lib/utils"
+interface ResizableProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  minWidth?: number
+  maxWidth?: number
+  defaultWidth?: number
+  onWidthChange?: (width: number) => void
+}
 
-const ResizablePanelGroup = ({
-  className,
-  ...props
-}: React.ComponentProps<typeof ResizablePrimitive.PanelGroup>) => (
-  <ResizablePrimitive.PanelGroup
-    className={cn(
-      "flex h-full w-full data-[panel-group-direction=vertical]:flex-col",
-      className
-    )}
-    {...props}
-  />
+interface ResizablePanelProps {
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  defaultSize?: number
+  minSize?: number
+  maxSize?: number
+}
+
+interface ResizableHandleProps {
+  style?: StyleProp<ViewStyle>
+}
+
+const ResizableContext = React.createContext<{
+  width: number
+  setWidth: (width: number) => void
+}>({
+  width: 0,
+  setWidth: () => { },
+})
+
+const Resizable = React.forwardRef<View, ResizableProps>(
+  ({ children, style, minWidth = 100, maxWidth = 500, defaultWidth = 200, onWidthChange }, ref) => {
+    const [width, setWidth] = React.useState(defaultWidth)
+
+    React.useEffect(() => {
+      onWidthChange?.(width)
+    }, [width, onWidthChange])
+
+    return (
+      <ResizableContext.Provider value={{ width, setWidth }}>
+        <View ref={ref} style={[styles.container, style]}>
+          {children}
+        </View>
+      </ResizableContext.Provider>
+    )
+  }
 )
 
-const ResizablePanel = ResizablePrimitive.Panel
+const ResizablePanel = React.forwardRef<View, ResizablePanelProps>(
+  ({ children, style, defaultSize = 100, minSize = 50, maxSize = 500 }, ref) => {
+    const { width } = React.useContext(ResizableContext)
 
-const ResizableHandle = ({
-  withHandle,
-  className,
-  ...props
-}: React.ComponentProps<typeof ResizablePrimitive.PanelResizeHandle> & {
-  withHandle?: boolean
-}) => (
-  <ResizablePrimitive.PanelResizeHandle
-    className={cn(
-      "relative flex w-px items-center justify-center bg-border after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:h-1 data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0 [&[data-panel-group-direction=vertical]>div]:rotate-90",
-      className
-    )}
-    {...props}
-  >
-    {withHandle && (
-      <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border bg-border">
-        <GripVertical className="h-2.5 w-2.5" />
-      </div>
-    )}
-  </ResizablePrimitive.PanelResizeHandle>
+    return (
+      <View ref={ref} style={[{ width }, style]}>
+        {children}
+      </View>
+    )
+  }
 )
 
-export { ResizablePanelGroup, ResizablePanel, ResizableHandle }
+const ResizableHandle = React.forwardRef<View, ResizableHandleProps>(
+  ({ style }, ref) => {
+    const { width, setWidth } = React.useContext(ResizableContext)
+    const panResponder = React.useRef(
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onPanResponderMove: (_, gestureState: PanResponderGestureState) => {
+          const newWidth = width + gestureState.dx
+          setWidth(Math.max(100, Math.min(500, newWidth)))
+        },
+      })
+    ).current
+
+    return (
+      <View
+        ref={ref}
+        style={[styles.handle, style]}
+        {...panResponder.panHandlers}
+      >
+        <Feather name="menu" size={16} color="#666" />
+      </View>
+    )
+  }
+)
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+  },
+  handle: {
+    width: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f4f4f5",
+  },
+})
+
+export { Resizable, ResizablePanel, ResizableHandle }
