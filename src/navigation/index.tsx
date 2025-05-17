@@ -31,12 +31,10 @@ export const Navigation = () => {
         }
     };
 
-    // Check onboarding status when component mounts
     useEffect(() => {
         checkOnboardingStatus();
     }, []);
 
-    // Add a focus listener to recheck status when screen comes into focus
     useEffect(() => {
         const unsubscribe = storage.addListener(StorageKeys.HAS_SEEN_ONBOARDING, async () => {
             await checkOnboardingStatus();
@@ -53,18 +51,17 @@ export const Navigation = () => {
 
     return (
         <NavigationContainer>
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
-                {!hasSeenOnboarding ? (
+            <Stack.Navigator 
+                screenOptions={{ headerShown: false }}
+                initialRouteName={!hasSeenOnboarding ? "Onboarding" : !user ? "Login" : "Main"}
+            >
+                <Stack.Group>
                     <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-                ) : !user ? (
-                    <>
-                        <Stack.Screen name="Login" component={LoginScreen} />
-                        <Stack.Screen name="SignUp" component={SignUpScreen} />
-                        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-                    </>
-                ) : (
+                    <Stack.Screen name="Login" component={LoginScreen} />
+                    <Stack.Screen name="SignUp" component={SignUpScreen} />
+                    <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
                     <Stack.Screen name="Main" component={DrawerNavigator} />
-                )}
+                </Stack.Group>
             </Stack.Navigator>
         </NavigationContainer>
     );

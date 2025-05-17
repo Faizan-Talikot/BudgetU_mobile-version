@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     View,
     ScrollView,
@@ -7,59 +7,219 @@ import {
     TouchableOpacity,
     Modal,
     TextInput,
+    Dimensions,
+    Animated,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { colors, typography, spacing, borderRadius, shadows } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
+import { format, addMonths, subMonths } from 'date-fns';
+
+const { width } = Dimensions.get('window');
+
+// Local theme colors
+const THEME = {
+    white: '#FFFFFF',
+};
+
+// Define transaction type
+interface Transaction {
+    id: string;
+    type: 'income' | 'expense';
+    name: string;
+    category: string;
+    amount: number;
+    date: string;
+    time: string;
+}
+
+// Dummy transactions data grouped by date
+const transactionsByDate: Record<string, Transaction[]> = {
+    'May 18, Sunday': [
+        {
+            id: '1',
+            type: 'income',
+            name: 'Salary',
+            category: 'Card',
+            amount: 10000.00,
+            date: 'May 18',
+            time: '10:30 AM'
+        },
+        {
+            id: '2',
+            type: 'expense',
+            name: 'Beauty',
+            category: 'Card',
+            amount: 100.00,
+            date: 'May 18',
+            time: '2:15 PM'
+        },
+    ],
+    'May 12, Monday': [
+        {
+            id: '3',
+            type: 'income',
+            name: 'Grants',
+            category: 'Cash',
+            amount: 500.00,
+            date: 'May 12',
+            time: '11:45 AM'
+        },
+        {
+            id: '4',
+            type: 'expense',
+            name: 'Bills',
+            category: 'Cash',
+            amount: 500.00,
+            date: 'May 12',
+            time: '4:20 PM'
+        },
+    ],
+};
 
 const TransactionsScreen = () => {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [activeFilter, setActiveFilter] = useState('All');
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const fabAnim = useRef(new Animated.Value(1)).current;
+    const lastScrollY = useRef(0);
+    const [transactionType, setTransactionType] = useState('INCOME');
+    const [amount, setAmount] = useState('');
+    const [notes, setNotes] = useState('');
+
+    // Dummy data for demonstration
+    const summaryData = {
+        expense: 600.00,
+        income: 10500.00,
+        total: 9900.00
+    };
+
+    const handlePreviousMonth = () => {
+        setCurrentDate(prevDate => subMonths(prevDate, 1));
+    };
+
+    const handleNextMonth = () => {
+        setCurrentDate(prevDate => addMonths(prevDate, 1));
+    };
+
+    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const currentScrollY = event.nativeEvent.contentOffset.y;
+        
+        if (currentScrollY > lastScrollY.current && currentScrollY > 20) {
+            // Scrolling down - hide FAB
+            Animated.spring(fabAnim, {
+                toValue: 0,
+                useNativeDriver: true,
+            }).start();
+        } else {
+            // Scrolling up - show FAB
+            Animated.spring(fabAnim, {
+                toValue: 1,
+                useNativeDriver: true,
+            }).start();
+        }
+        
+        lastScrollY.current = currentScrollY;
+    };
+
+    const handleNumberPress = (num: string) => {
+        if (amount.includes('.') && num === '.') return;
+        setAmount(prev => prev + num);
+    };
+
+    const handleDeletePress = () => {
+        setAmount(prev => prev.slice(0, -1));
+    };
+
+    const handleOperatorPress = (operator: string) => {
+        // Handle basic calculations if needed
+        console.log(operator);
+    };
+
+    const renderTransaction = (transaction: Transaction) => (
+        <Card key={transaction.id} style={styles.transactionCard}>
+            <TouchableOpacity style={styles.transaction}>
+                <View style={[
+                    styles.transactionIconContainer,
+                    transaction.type === 'expense' ? styles.expenseIcon : styles.incomeIcon
+                ]}>
+                    <Ionicons 
+                        name={transaction.type === 'expense' ? "arrow-down" : "arrow-up"} 
+                        size={20} 
+                        color={THEME.white}
+                    />
+                </View>
+                <View style={styles.transactionInfo}>
+                    <Text style={styles.transactionName}>{transaction.name}</Text>
+                    <Text style={styles.transactionCategory}>{transaction.category}</Text>
+                </View>
+                <View style={styles.transactionAmount}>
+                    <Text style={[
+                        styles.amountText,
+                        transaction.type === 'expense' ? styles.expenseText : styles.incomeText
+                    ]}>
+                        {transaction.type === 'expense' ? '-' : '+'}₹{transaction.amount.toFixed(2)}
+                    </Text>
+                    <Text style={styles.timeText}>{transaction.time}</Text>
+                </View>
+            </TouchableOpacity>
+        </Card>
+    );
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView style={styles.scrollView}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>My Transactions</Text>
-                    <Text style={styles.subtitle}>
-                        Track and manage your expenses and income
+            <ScrollView 
+                style={styles.scrollView}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+            >
+                {/* Month Navigation */}
+                <View style={styles.monthContainer}>
+                    <TouchableOpacity onPress={handlePreviousMonth} style={styles.monthArrow}>
+                        <Ionicons name="chevron-back" size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    <Text style={styles.monthText}>
+                        {format(currentDate, 'MMMM, yyyy')}
                     </Text>
+                    <TouchableOpacity onPress={handleNextMonth} style={styles.monthArrow}>
+                        <Ionicons name="chevron-forward" size={24} color={colors.text} />
+                    </TouchableOpacity>
                 </View>
 
-                <Button
-                    onPress={() => setIsModalVisible(true)}
-                    style={styles.addButton}
-                    fullWidth
-                >
-                    + Add Transaction
-                </Button>
-
-                {/* Search Bar */}
-                <View style={styles.searchContainer}>
-                    <View style={styles.searchBar}>
-                        <Ionicons name="search" size={20} color={colors.textSecondary} />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search transactions..."
-                            placeholderTextColor={colors.textSecondary}
-                        />
+                {/* Summary Cards */}
+                <View style={styles.summaryContainer}>
+                    <View style={[styles.summaryCard, styles.expenseCard]}>
+                        <Text style={styles.summaryLabel}>EXPENSE</Text>
+                        <Text style={[styles.summaryAmount, styles.expenseText]}>
+                            ₹{summaryData.expense.toFixed(2)}
+                        </Text>
+                    </View>
+                    <View style={[styles.summaryCard, styles.incomeCard]}>
+                        <Text style={styles.summaryLabel}>INCOME</Text>
+                        <Text style={[styles.summaryAmount, styles.incomeText]}>
+                            ₹{summaryData.income.toFixed(2)}
+                        </Text>
+                    </View>
+                    <View style={[styles.summaryCard, styles.totalCard]}>
+                        <Text style={styles.summaryLabel}>TOTAL</Text>
+                        <Text style={[styles.summaryAmount, styles.totalText]}>
+                            ₹{summaryData.total.toFixed(2)}
+                        </Text>
                     </View>
                 </View>
 
-                {/* Filters */}
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.filtersContainer}
-                >
+                {/* Transaction Filters */}
+                <View style={styles.filtersContainer}>
                     {['All', 'Expenses', 'Income'].map((filter) => (
                         <TouchableOpacity
                             key={filter}
                             style={[
-                                styles.filterChip,
-                                activeFilter === filter && styles.activeFilterChip,
+                                styles.filterButton,
+                                activeFilter === filter && styles.activeFilterButton,
                             ]}
                             onPress={() => setActiveFilter(filter)}
                         >
@@ -73,43 +233,42 @@ const TransactionsScreen = () => {
                             </Text>
                         </TouchableOpacity>
                     ))}
-                </ScrollView>
+                </View>
 
                 {/* Transaction List */}
                 <View style={styles.transactionList}>
-                    <View style={styles.transactionHeader}>
-                        <Text style={styles.transactionTitle}>Transaction History</Text>
-                        <Text style={styles.transactionCount}>4 transactions</Text>
-                    </View>
-
-                    <Card style={styles.transactionCard}>
-                        <TouchableOpacity style={styles.transaction}>
-                            <View style={styles.transactionIconContainer}>
-                                <Ionicons
-                                    name="arrow-down"
-                                    size={20}
-                                    color={colors.error}
-                                    style={styles.transactionIcon}
-                                />
-                            </View>
-                            <View style={styles.transactionInfo}>
-                                <Text style={styles.transactionName}>food</Text>
-                                <View style={styles.transactionMeta}>
-                                    <Text style={styles.transactionCategory}>food</Text>
-                                    <Text style={styles.transactionBudget}>May budget</Text>
-                                </View>
-                            </View>
-                            <View style={styles.transactionDetails}>
-                                <Text style={[styles.transactionAmount, styles.expense]}>
-                                    -₹20
-                                </Text>
-                                <Text style={styles.transactionDate}>09 May</Text>
-                                <Text style={styles.transactionMethod}>Cash</Text>
-                            </View>
-                        </TouchableOpacity>
-                    </Card>
+                    {Object.entries(transactionsByDate).map(([date, transactions]) => (
+                        <View key={date}>
+                            <Text style={styles.dateHeader}>{date}</Text>
+                            {transactions.map(transaction => renderTransaction(transaction))}
+                        </View>
+                    ))}
                 </View>
             </ScrollView>
+
+            <Animated.View 
+                style={[
+                    styles.fab,
+                    {
+                        transform: [
+                            {
+                                scale: fabAnim
+                            },
+                            {
+                                translateY: fabAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [100, 0]
+                                })
+                            }
+                        ],
+                        opacity: fabAnim
+                    }
+                ]}
+            >
+                <TouchableOpacity onPress={() => setIsModalVisible(true)}>
+                    <Ionicons name="add" size={24} color={THEME.white} />
+                </TouchableOpacity>
+            </Animated.View>
 
             {/* Add Transaction Modal */}
             <Modal
@@ -119,79 +278,148 @@ const TransactionsScreen = () => {
                 onRequestClose={() => setIsModalVisible(false)}
             >
                 <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Add New Transaction</Text>
-                        <Text style={styles.modalSubtitle}>
-                            Record your income or expenses to keep track of your finances.
-                        </Text>
+                    <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+                        {/* Header */}
+                        <View style={styles.modalHeader}>
+                            <TouchableOpacity 
+                                onPress={() => setIsModalVisible(false)}
+                                style={[styles.modalHeaderButton, styles.headerButtonLeft]}
+                            >
+                                <Ionicons name="close-outline" size={24} color={colors.text} />
+                                <Text style={styles.headerButtonText}>CANCEL</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    // Handle save
+                                    setIsModalVisible(false);
+                                }}
+                                style={[styles.modalHeaderButton, styles.headerButtonRight]}
+                            >
+                                <Text style={[styles.headerButtonText, styles.saveButtonText]}>SAVE</Text>
+                                <Ionicons name="checkmark-outline" size={24} color={colors.primary} />
+                            </TouchableOpacity>
+                        </View>
 
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Type</Text>
-                            <View style={styles.typeContainer}>
+                        {/* Transaction Type Selector */}
+                        <View style={styles.transactionTypeContainer}>
+                            {['INCOME', 'EXPENSE', 'TRANSFER'].map((type) => (
                                 <TouchableOpacity
-                                    style={[styles.typeButton, styles.activeTypeButton]}
+                                    key={type}
+                                    style={[
+                                        styles.transactionTypeButton,
+                                        transactionType === type && styles.activeTransactionType
+                                    ]}
+                                    onPress={() => setTransactionType(type)}
                                 >
-                                    <Text style={[styles.typeText, styles.activeTypeText]}>
-                                        Income
+                                    <Text style={[
+                                        styles.transactionTypeText,
+                                        transactionType === type && styles.activeTransactionTypeText
+                                    ]}>
+                                        {type}
                                     </Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.typeButton}>
-                                    <Text style={styles.typeText}>Expense</Text>
+                            ))}
+                        </View>
+
+                        {/* Account and Category Selectors */}
+                        <View style={styles.selectorsContainer}>
+                            <TouchableOpacity style={styles.selector}>
+                                <Ionicons name="wallet-outline" size={24} color={colors.primary} />
+                                <Text style={styles.selectorText}>Account</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.selector}>
+                                <Ionicons name="pricetag-outline" size={24} color={colors.primary} />
+                                <Text style={styles.selectorText}>Category</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Notes Input */}
+                        <TextInput
+                            style={styles.notesInput}
+                            placeholder="Add notes"
+                            placeholderTextColor={colors.textSecondary}
+                            value={notes}
+                            onChangeText={setNotes}
+                            multiline
+                        />
+
+                        {/* Amount Display */}
+                        <View style={styles.amountDisplay}>
+                            <Text style={styles.displayText}>
+                                {amount || '0'}
+                            </Text>
+                        </View>
+
+                        {/* Calculator Keypad */}
+                        <View style={styles.keypad}>
+                            <View style={styles.keypadRow}>
+                                <TouchableOpacity style={styles.keypadButton} onPress={() => handleNumberPress('7')}>
+                                    <Text style={styles.keypadButtonText}>7</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.keypadButton} onPress={() => handleNumberPress('8')}>
+                                    <Text style={styles.keypadButtonText}>8</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.keypadButton} onPress={() => handleNumberPress('9')}>
+                                    <Text style={styles.keypadButtonText}>9</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.keypadButton, styles.operatorButton]} onPress={() => handleOperatorPress('+')}>
+                                    <Text style={styles.operatorButtonText}>+</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.keypadRow}>
+                                <TouchableOpacity style={styles.keypadButton} onPress={() => handleNumberPress('4')}>
+                                    <Text style={styles.keypadButtonText}>4</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.keypadButton} onPress={() => handleNumberPress('5')}>
+                                    <Text style={styles.keypadButtonText}>5</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.keypadButton} onPress={() => handleNumberPress('6')}>
+                                    <Text style={styles.keypadButtonText}>6</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.keypadButton, styles.operatorButton]} onPress={() => handleOperatorPress('-')}>
+                                    <Text style={styles.operatorButtonText}>-</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.keypadRow}>
+                                <TouchableOpacity style={styles.keypadButton} onPress={() => handleNumberPress('1')}>
+                                    <Text style={styles.keypadButtonText}>1</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.keypadButton} onPress={() => handleNumberPress('2')}>
+                                    <Text style={styles.keypadButtonText}>2</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.keypadButton} onPress={() => handleNumberPress('3')}>
+                                    <Text style={styles.keypadButtonText}>3</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.keypadButton, styles.operatorButton]} onPress={() => handleOperatorPress('×')}>
+                                    <Text style={styles.operatorButtonText}>×</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.keypadRow}>
+                                <TouchableOpacity style={styles.keypadButton} onPress={() => handleNumberPress('0')}>
+                                    <Text style={styles.keypadButtonText}>0</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.keypadButton} onPress={() => handleNumberPress('.')}>
+                                    <Text style={styles.keypadButtonText}>.</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.keypadButton} onPress={handleDeletePress}>
+                                    <Ionicons name="backspace-outline" size={24} color={colors.primary} />
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.keypadButton, styles.operatorButton]} onPress={() => handleOperatorPress('÷')}>
+                                    <Text style={styles.operatorButtonText}>÷</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
 
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Amount (₹)</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="0.00"
-                                keyboardType="numeric"
-                                placeholderTextColor={colors.textSecondary}
-                            />
-                        </View>
-
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Category</Text>
-                            <TouchableOpacity style={styles.selectButton}>
-                                <Text style={styles.selectButtonText}>Select category</Text>
-                                <Ionicons name="chevron-down" size={20} color={colors.text} />
+                        {/* Date and Time Selector */}
+                        <View style={styles.dateTimeContainer}>
+                            <TouchableOpacity style={styles.dateSelector}>
+                                <Ionicons name="calendar-outline" size={24} color={colors.primary} />
+                                <Text style={styles.dateText}>{format(new Date(), 'MMM dd, yyyy')}</Text>
                             </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Description</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="e.g. Grocery shopping, Dinner out, Salary"
-                                placeholderTextColor={colors.textSecondary}
-                            />
-                        </View>
-
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Budget (Optional)</Text>
-                            <TouchableOpacity style={styles.selectButton}>
-                                <Text style={styles.selectButtonText}>No specific budget</Text>
-                                <Ionicons name="chevron-down" size={20} color={colors.text} />
+                            <TouchableOpacity style={styles.timeSelector}>
+                                <Ionicons name="time-outline" size={24} color={colors.primary} />
+                                <Text style={styles.timeText}>{format(new Date(), 'h:mm a')}</Text>
                             </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.modalButtons}>
-                            <Button
-                                variant="primary"
-                                onPress={() => { }}
-                                style={styles.saveButton}
-                                fullWidth
-                            >
-                                Save Transaction
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onPress={() => setIsModalVisible(false)}
-                                fullWidth
-                            >
-                                Cancel
-                            </Button>
                         </View>
                     </View>
                 </View>
@@ -208,84 +436,93 @@ const styles = StyleSheet.create({
     scrollView: {
         flex: 1,
     },
-    header: {
-        padding: spacing.lg,
+    monthContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.lg,
     },
-    title: {
-        fontSize: typography.sizes['2xl'],
+    monthArrow: {
+        padding: spacing.sm,
+    },
+    monthText: {
+        fontSize: typography.sizes.xl,
         fontWeight: typography.weights.bold,
         color: colors.text,
     },
-    subtitle: {
-        fontSize: typography.sizes.base,
-        color: colors.textSecondary,
-        marginTop: spacing.xs,
-    },
-    addButton: {
-        marginHorizontal: spacing.lg,
+    summaryContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.lg,
         marginBottom: spacing.xl,
     },
-    searchContainer: {
-        paddingHorizontal: spacing.lg,
-        marginBottom: spacing.lg,
-    },
-    searchBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.secondary,
-        borderRadius: borderRadius.lg,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-    },
-    searchInput: {
+    summaryCard: {
         flex: 1,
-        marginLeft: spacing.sm,
-        fontSize: typography.sizes.base,
-        color: colors.text,
+        padding: spacing.md,
+        borderRadius: borderRadius.lg,
+        marginHorizontal: spacing.xs,
+        ...shadows.sm,
+    },
+    expenseCard: {
+        backgroundColor: '#FEE2E2',
+    },
+    incomeCard: {
+        backgroundColor: '#DCFCE7',
+    },
+    totalCard: {
+        backgroundColor: '#E0E7FF',
+    },
+    summaryLabel: {
+        fontSize: typography.sizes.xs,
+        fontWeight: typography.weights.medium,
+        color: colors.textSecondary,
+        marginBottom: spacing.xs,
+    },
+    summaryAmount: {
+        fontSize: typography.sizes.lg,
+        fontWeight: typography.weights.bold,
+    },
+    expenseText: {
+        color: '#DC2626',
+    },
+    incomeText: {
+        color: '#059669',
+    },
+    totalText: {
+        color: '#4F46E5',
     },
     filtersContainer: {
+        flexDirection: 'row',
         paddingHorizontal: spacing.lg,
         marginBottom: spacing.xl,
     },
-    filterChip: {
-        paddingHorizontal: spacing.lg,
+    filterButton: {
         paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.lg,
         borderRadius: borderRadius.full,
         backgroundColor: colors.secondary,
         marginRight: spacing.sm,
     },
-    activeFilterChip: {
+    activeFilterButton: {
         backgroundColor: colors.primary,
     },
     filterText: {
         color: colors.textSecondary,
         fontSize: typography.sizes.sm,
+        fontWeight: typography.weights.medium,
     },
     activeFilterText: {
         color: colors.background,
-        fontWeight: typography.weights.medium,
     },
     transactionList: {
         paddingHorizontal: spacing.lg,
     },
-    transactionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: spacing.md,
-    },
-    transactionTitle: {
-        fontSize: typography.sizes.lg,
-        fontWeight: typography.weights.semibold,
-        color: colors.text,
-    },
-    transactionCount: {
-        fontSize: typography.sizes.sm,
-        color: colors.textSecondary,
-    },
     transactionCard: {
-        padding: 0,
         marginBottom: spacing.md,
+        borderRadius: borderRadius.lg,
+        backgroundColor: colors.background,
+        ...shadows.sm,
     },
     transaction: {
         flexDirection: 'row',
@@ -296,13 +533,15 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: colors.secondary,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: spacing.md,
     },
-    transactionIcon: {
-        transform: [{ rotate: '45deg' }],
+    expenseIcon: {
+        backgroundColor: '#DC2626',
+    },
+    incomeIcon: {
+        backgroundColor: '#059669',
     },
     transactionInfo: {
         flex: 1,
@@ -313,38 +552,33 @@ const styles = StyleSheet.create({
         color: colors.text,
         marginBottom: spacing.xs,
     },
-    transactionMeta: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
     transactionCategory: {
         fontSize: typography.sizes.sm,
         color: colors.textSecondary,
-        marginRight: spacing.sm,
-    },
-    transactionBudget: {
-        fontSize: typography.sizes.sm,
-        color: colors.primary,
-    },
-    transactionDetails: {
-        alignItems: 'flex-end',
     },
     transactionAmount: {
+        alignItems: 'flex-end',
+    },
+    amountText: {
         fontSize: typography.sizes.base,
-        fontWeight: typography.weights.medium,
+        fontWeight: typography.weights.semibold,
         marginBottom: spacing.xs,
     },
-    expense: {
-        color: colors.error,
-    },
-    transactionDate: {
-        fontSize: typography.sizes.sm,
+    timeText: {
+        fontSize: typography.sizes.xs,
         color: colors.textSecondary,
-        marginBottom: spacing.xs,
     },
-    transactionMethod: {
-        fontSize: typography.sizes.sm,
-        color: colors.textSecondary,
+    fab: {
+        position: 'absolute',
+        right: spacing.xl,
+        bottom: spacing.xl,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...shadows.lg,
     },
     modalContainer: {
         flex: 1,
@@ -352,80 +586,171 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: colors.background,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
-        padding: spacing.xl,
+        padding: spacing.md,
+        paddingBottom: spacing.lg,
     },
-    modalTitle: {
-        fontSize: typography.sizes.xl,
-        fontWeight: typography.weights.bold,
-        color: colors.text,
-        marginBottom: spacing.xs,
-    },
-    modalSubtitle: {
-        fontSize: typography.sizes.base,
-        color: colors.textSecondary,
-        marginBottom: spacing.xl,
-    },
-    formGroup: {
-        marginBottom: spacing.lg,
-    },
-    label: {
-        fontSize: typography.sizes.sm,
-        color: colors.text,
-        marginBottom: spacing.xs,
-    },
-    typeContainer: {
+    modalHeader: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+        paddingVertical: spacing.xs,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+    },
+    modalHeaderButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: spacing.xs,
+        borderRadius: borderRadius.md,
+    },
+    headerButtonLeft: {
+        gap: spacing.xs,
+    },
+    headerButtonRight: {
+        gap: spacing.xs,
+    },
+    headerButtonText: {
+        fontSize: typography.sizes.base,
+        fontWeight: typography.weights.medium,
+        color: colors.text,
+    },
+    saveButtonText: {
+        color: colors.primary,
+        fontWeight: typography.weights.bold,
+    },
+    transactionTypeContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: spacing.md,
         backgroundColor: colors.secondary,
         borderRadius: borderRadius.lg,
         padding: spacing.xs,
     },
-    typeButton: {
+    transactionTypeButton: {
         flex: 1,
-        paddingVertical: spacing.sm,
+        paddingVertical: spacing.xs,
         alignItems: 'center',
         borderRadius: borderRadius.md,
     },
-    activeTypeButton: {
+    activeTransactionType: {
         backgroundColor: colors.background,
         ...shadows.sm,
     },
-    typeText: {
-        fontSize: typography.sizes.base,
+    transactionTypeText: {
         color: colors.textSecondary,
-    },
-    activeTypeText: {
-        color: colors.text,
+        fontSize: typography.sizes.sm,
         fontWeight: typography.weights.medium,
     },
-    input: {
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        fontSize: typography.sizes.base,
-        color: colors.text,
+    activeTransactionTypeText: {
+        color: colors.primary,
     },
-    selectButton: {
+    selectorsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        marginBottom: spacing.sm,
+        gap: spacing.xs,
+    },
+    selector: {
+        flex: 1,
+        flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: colors.border,
+        backgroundColor: colors.secondary,
+        padding: spacing.sm,
+        borderRadius: borderRadius.lg,
+    },
+    selectorText: {
+        color: colors.text,
+        marginLeft: spacing.xs,
+        fontSize: typography.sizes.sm,
+    },
+    notesInput: {
+        backgroundColor: colors.secondary,
+        borderRadius: borderRadius.lg,
+        padding: spacing.sm,
+        color: colors.text,
+        height: 80,
+        textAlignVertical: 'top',
+        marginBottom: spacing.sm,
+    },
+    amountDisplay: {
+        backgroundColor: colors.secondary,
         borderRadius: borderRadius.lg,
         padding: spacing.md,
+        marginBottom: spacing.sm,
     },
-    selectButtonText: {
-        fontSize: typography.sizes.base,
-        color: colors.textSecondary,
+    displayText: {
+        color: colors.text,
+        fontSize: typography.sizes['3xl'],
+        fontWeight: typography.weights.bold,
+        textAlign: 'right',
     },
-    modalButtons: {
-        marginTop: spacing.xl,
+    keypad: {
+        gap: spacing.xs,
     },
-    saveButton: {
+    keypadRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: spacing.xs,
+    },
+    keypadButton: {
+        flex: 1,
+        aspectRatio: 1,
+        backgroundColor: colors.secondary,
+        borderRadius: borderRadius.lg,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.xs,
+    },
+    operatorButton: {
+        backgroundColor: colors.primary,
+    },
+    keypadButtonText: {
+        color: colors.text,
+        fontSize: typography.sizes.xl,
+        fontWeight: typography.weights.bold,
+    },
+    operatorButtonText: {
+        color: colors.background,
+        fontSize: typography.sizes.xl,
+        fontWeight: typography.weights.bold,
+    },
+    dateTimeContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: spacing.sm,
+        gap: spacing.xs,
+    },
+    dateSelector: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.secondary,
+        padding: spacing.sm,
+        borderRadius: borderRadius.lg,
+        gap: spacing.xs,
+    },
+    timeSelector: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.secondary,
+        padding: spacing.sm,
+        borderRadius: borderRadius.lg,
+        gap: spacing.xs,
+    },
+    dateText: {
+        color: colors.text,
+        fontSize: typography.sizes.sm,
+    },
+    dateHeader: {
+        fontSize: typography.sizes.lg,
+        fontWeight: typography.weights.semibold,
+        color: colors.text,
         marginBottom: spacing.md,
+        marginTop: spacing.lg,
     },
 });
 

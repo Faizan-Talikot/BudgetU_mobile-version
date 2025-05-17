@@ -8,7 +8,8 @@ const API_URL = env.API_URL;
 interface User {
     id: string;
     email: string;
-    name: string;
+    firstName: string;
+    lastName: string;
     // Add other user properties as needed
 }
 
@@ -16,7 +17,7 @@ interface AuthContextType {
     user: User | null;
     loading: boolean;
     signIn: (email: string, password: string) => Promise<void>;
-    signUp: (email: string, password: string, name: string) => Promise<void>;
+    signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
     signOut: () => Promise<void>;
 }
 
@@ -64,23 +65,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const signUp = async (email: string, password: string, name: string) => {
+    const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
         try {
             setLoading(true);
+            console.log('Starting signup process...');
+            console.log('API URL:', `${API_URL}/api/users/register`);
+            
             const response = await fetch(`${API_URL}/api/users/register`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, name }),
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    email, 
+                    password, 
+                    firstName,
+                    lastName
+                }),
             });
 
+            console.log('Response status:', response.status);
             const data = await response.json();
-            if (!response.ok) throw new Error(data.message);
+            console.log('Response data:', data);
 
+            if (!response.ok) {
+                throw new Error(data.message || 'Registration failed');
+            }
+
+            // Store user data
             await storage.set(StorageKeys.USER_DATA, data.user);
             setUser(data.user);
         } catch (error) {
-            console.error('Sign up error:', error);
-            throw error;
+            console.error('Detailed signup error:', error);
+            if (error instanceof Error) {
+                throw new Error(error.message);
+            } else {
+                throw new Error('An unexpected error occurred during signup');
+            }
         } finally {
             setLoading(false);
         }

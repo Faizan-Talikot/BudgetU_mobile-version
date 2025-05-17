@@ -3,12 +3,12 @@ export default {
   slug: 'budgetu',
   version: '1.0.0',
   orientation: 'portrait',
-  icon: './assets/icon.png',
+  icon: 'src/assets/images/app_logo_budgetU.png',
   userInterfaceStyle: 'light',
   splash: {
-    image: './assets/splash.png',
+    image: 'src/assets/images/app_logo_budgetU.png',
     resizeMode: 'contain',
-    backgroundColor: '#ffffff'
+    backgroundColor: '#1B3A4B'
   },
   assetBundlePatterns: ['**/*'],
   ios: {
@@ -17,18 +17,9 @@ export default {
   },
   android: {
     adaptiveIcon: {
-      foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#ffffff'
+      foregroundImage: 'src/assets/images/app_logo_budgetU.png',
+      backgroundColor: '#1B3A4B'
     },
     package: 'com.budgetu.app'
-  },
-  plugins: [
-    [
-      'expo-notifications',
-      {
-        icon: './assets/notification-icon.png',
-        color: '#ffffff',
-      },
-    ],
-  ],
+  }
 }; 

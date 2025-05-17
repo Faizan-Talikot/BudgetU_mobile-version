@@ -1,6 +1,6 @@
 const ENV = {
     development: {
-        API_URL: 'http://192.168.0.104:5000',
+        API_URL: 'http://192.168.0.106:5000',
         APP_NAME: 'BudgetU (Dev)',
     },
     staging: {

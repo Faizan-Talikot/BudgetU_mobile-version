@@ -8,12 +8,29 @@ import {
     KeyboardAvoidingView,
     Platform,
     Alert,
+    Dimensions,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { colors, typography, spacing } from '../../theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Loading } from '../../components/Loading';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+
+const { width, height } = Dimensions.get('window');
+
+const THEME = {
+    primary: '#1B3A4B',
+    secondary: '#3B82F6',
+    accent: '#60A5FA',
+    background: '#F8FAFC',
+    white: '#FFFFFF',
+    text: '#1B3A4B',
+    textSecondary: '#64748B',
+    border: '#E2E8F0',
+};
 
 export default function LoginScreen() {
     const navigation = useNavigation();
@@ -21,6 +38,7 @@ export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const handleLogin = async () => {
         if (!email || !password) {
@@ -49,57 +67,93 @@ export default function LoginScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.content}
             >
-                <View style={styles.header}>
-                    <Text style={styles.title}>Welcome Back!</Text>
-                    <Text style={styles.subtitle}>
-                        Sign in to continue managing your finances
-                    </Text>
+                <View style={styles.headerContainer}>
+                    <LinearGradient
+                        colors={[THEME.primary, THEME.secondary]}
+                        style={StyleSheet.absoluteFill}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    />
+                    <Image
+                        source={require('../../assets/images/app_logo_budgetU_bgremove.png')}
+                        style={styles.logo}
+                        resizeMode="contain"
+                    />
+                    <Text style={styles.welcomeText}>Welcome Back!</Text>
+                    <Text style={styles.subtitle}>Take control of your finances</Text>
                 </View>
 
-                <View style={styles.form}>
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Email</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Enter your email"
-                            value={email}
-                            onChangeText={setEmail}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            autoComplete="email"
-                        />
-                    </View>
+                <View style={styles.formContainer}>
+                    <View style={styles.form}>
+                        <View style={styles.inputGroup}>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Email"
+                                placeholderTextColor={THEME.textSecondary}
+                                value={email}
+                                onChangeText={setEmail}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                autoComplete="email"
+                            />
+                        </View>
 
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Password</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Enter your password"
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry
-                        />
-                    </View>
+                        <View style={styles.inputGroup}>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Password"
+                                placeholderTextColor={THEME.textSecondary}
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry={!showPassword}
+                            />
+                            <TouchableOpacity 
+                                onPress={() => setShowPassword(!showPassword)}
+                                style={styles.passwordToggle}
+                            >
+                                <Ionicons
+                                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                                    size={20}
+                                    color={THEME.textSecondary}
+                                />
+                            </TouchableOpacity>
+                        </View>
 
-                    <TouchableOpacity
-                        onPress={() => navigation.navigate('ForgotPassword')}
-                        style={styles.forgotPassword}
-                    >
-                        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.loginButton}
-                        onPress={handleLogin}
-                    >
-                        <Text style={styles.loginButtonText}>Sign In</Text>
-                    </TouchableOpacity>
-
-                    <View style={styles.signupContainer}>
-                        <Text style={styles.signupText}>Don't have an account? </Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-                            <Text style={styles.signupLink}>Sign Up</Text>
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('ForgotPassword')}
+                            style={styles.forgotPassword}
+                        >
+                            <Text style={styles.forgotPasswordText}>Forgot password?</Text>
                         </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.signInButton}
+                            onPress={handleLogin}
+                        >
+                            <Text style={styles.signInButtonText}>Sign In</Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.dividerContainer}>
+                            <View style={styles.divider} />
+                            <Text style={styles.dividerText}>or continue with</Text>
+                            <View style={styles.divider} />
+                        </View>
+
+                        <View style={styles.socialButtons}>
+                            <TouchableOpacity style={styles.socialButton}>
+                                <Ionicons name="logo-google" size={24} color={THEME.text} />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.socialButton}>
+                                <Ionicons name="logo-apple" size={24} color={THEME.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.signupContainer}>
+                            <Text style={styles.signupText}>Don't have an account? </Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
+                                <Text style={styles.signupLink}>Sign Up</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </KeyboardAvoidingView>
@@ -110,63 +164,119 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: THEME.background,
     },
     content: {
         flex: 1,
-        padding: spacing.xl,
     },
-    header: {
-        marginBottom: spacing.xxl,
+    headerContainer: {
+        height: height * 0.35,
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
     },
-    title: {
-        fontSize: typography.sizes['3xl'],
-        fontWeight: typography.weights.bold,
-        color: colors.text,
+    logo: {
+        width: width * 0.50,
+        height: width * 0.50,
+        // tintColor: THEME.white,
+        marginBottom: spacing.lg,
+    },
+    welcomeText: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: THEME.white,
         marginBottom: spacing.sm,
+        marginTop: -40
     },
     subtitle: {
-        fontSize: typography.sizes.base,
-        color: colors.textSecondary,
+        fontSize: 16,
+        color: THEME.white,
+        opacity: 0.9,
+    },
+    formContainer: {
+        flex: 1,
+        backgroundColor: THEME.white,
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        padding: spacing.xl,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
     form: {
-        flex: 1,
+        width: '100%',
+        maxWidth: 400,
+        alignSelf: 'center',
     },
     inputGroup: {
         marginBottom: spacing.lg,
-    },
-    label: {
-        fontSize: typography.sizes.sm,
-        fontWeight: typography.weights.medium,
-        color: colors.text,
-        marginBottom: spacing.xs,
+        position: 'relative',
     },
     input: {
-        backgroundColor: colors.secondary,
-        borderRadius: 8,
-        padding: spacing.md,
-        fontSize: typography.sizes.base,
-        color: colors.text,
+        backgroundColor: THEME.background,
+        borderRadius: 12,
+        padding: spacing.lg,
+        fontSize: 16,
+        color: THEME.text,
+    },
+    passwordToggle: {
+        position: 'absolute',
+        right: spacing.md,
+        top: '50%',
+        transform: [{ translateY: -10 }],
     },
     forgotPassword: {
         alignSelf: 'flex-end',
         marginBottom: spacing.xl,
     },
     forgotPasswordText: {
-        color: colors.primary,
-        fontSize: typography.sizes.sm,
+        color: THEME.textSecondary,
+        fontSize: 14,
     },
-    loginButton: {
-        backgroundColor: colors.primary,
-        borderRadius: 8,
+    signInButton: {
+        backgroundColor: THEME.primary,
+        borderRadius: 12,
         padding: spacing.lg,
         alignItems: 'center',
         marginBottom: spacing.xl,
     },
-    loginButtonText: {
-        color: colors.background,
-        fontSize: typography.sizes.base,
-        fontWeight: typography.weights.medium,
+    signInButtonText: {
+        color: THEME.white,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    dividerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: spacing.xl,
+    },
+    divider: {
+        flex: 1,
+        height: 1,
+        backgroundColor: THEME.border,
+    },
+    dividerText: {
+        color: THEME.textSecondary,
+        fontSize: 14,
+        marginHorizontal: spacing.md,
+    },
+    socialButtons: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: spacing.xl,
+        marginBottom: spacing.xl,
+    },
+    socialButton: {
+        width: 50,
+        height: 50,
+        borderRadius: 12,
+        backgroundColor: THEME.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: THEME.border,
     },
     signupContainer: {
         flexDirection: 'row',
@@ -174,12 +284,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     signupText: {
-        fontSize: typography.sizes.base,
-        color: colors.textSecondary,
+        color: THEME.textSecondary,
+        fontSize: 14,
     },
     signupLink: {
-        fontSize: typography.sizes.base,
-        color: colors.primary,
-        fontWeight: typography.weights.medium,
+        color: THEME.primary,
+        fontSize: 14,
+        fontWeight: '500',
     },
 }); 
