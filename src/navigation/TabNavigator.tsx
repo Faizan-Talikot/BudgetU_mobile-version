@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DashboardScreen from '../screens/DashboardScreen';
 import BudgetsScreen from '../screens/BudgetsScreen';
 import TransactionsScreen from '../screens/TransactionsScreen';
+import AccountsScreen from '../screens/AccountsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -52,7 +53,7 @@ const TabNavigator = () => {
                     component={DashboardScreen}
                     options={{
                         tabBarIcon: ({ color, size }: TabBarIconProps) => (
-                            <Ionicons name="home-outline" size={24} color={color} />
+                            <Ionicons name="receipt-outline" size={24} color={color} />
                         ),
                     }}
                 />
@@ -61,7 +62,7 @@ const TabNavigator = () => {
                     component={BudgetsScreen}
                     options={{
                         tabBarIcon: ({ color, size }: TabBarIconProps) => (
-                            <Ionicons name="wallet-outline" size={24} color={color} />
+                            <Ionicons name="pie-chart-outline" size={24} color={color} />
                         ),
                     }}
                 />
@@ -70,7 +71,16 @@ const TabNavigator = () => {
                     component={TransactionsScreen}
                     options={{
                         tabBarIcon: ({ color, size }: TabBarIconProps) => (
-                            <Ionicons name="swap-horizontal-outline" size={24} color={color} />
+                            <Ionicons name="calculator-outline" size={24} color={color} />
+                        ),
+                    }}
+                />
+                <Tab.Screen
+                    name="Accounts"
+                    component={AccountsScreen}
+                    options={{
+                        tabBarIcon: ({ color, size }: TabBarIconProps) => (
+                            <Ionicons name="wallet-outline" size={24} color={color} />
                         ),
                     }}
                 />
@@ -79,7 +89,7 @@ const TabNavigator = () => {
                     component={CategoriesScreen}
                     options={{
                         tabBarIcon: ({ color, size }: TabBarIconProps) => (
-                            <Ionicons name="list-outline" size={24} color={color} />
+                            <Ionicons name="pricetag-outline" size={24} color={color} />
                         ),
                     }}
                 />

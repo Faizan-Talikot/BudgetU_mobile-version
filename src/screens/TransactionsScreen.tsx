@@ -11,6 +11,8 @@ import {
     Animated,
     NativeScrollEvent,
     NativeSyntheticEvent,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../components/Card';
@@ -18,6 +20,8 @@ import { Button } from '../components/Button';
 import { colors, typography, spacing, borderRadius, shadows } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { format, addMonths, subMonths } from 'date-fns';
+import { Calendar } from '../components/ui/calendar';
+import { TimePicker } from '../components/ui/time-picker';
 
 const { width } = Dimensions.get('window');
 
@@ -81,6 +85,23 @@ const transactionsByDate: Record<string, Transaction[]> = {
     ],
 };
 
+const accountOptions = [
+    { key: 'cash', name: 'Cash', icon: 'cash-outline', amount: 0 },
+    { key: 'upi', name: 'UPI', icon: 'phone-portrait-outline', amount: 0 },
+    { key: 'saving', name: 'Saving', icon: 'wallet-outline', amount: 0 },
+];
+
+const categoryOptions = [
+    { id: '1', name: 'Food & Dining', icon: 'restaurant-outline', color: '#FF6B6B' },
+    { id: '2', name: 'Transportation', icon: 'car-outline', color: '#4ECDC4' },
+    { id: '3', name: 'Shopping', icon: 'cart-outline', color: '#45B7D1' },
+    { id: '4', name: 'Bills & Utilities', icon: 'receipt-outline', color: '#96CEB4' },
+    { id: '5', name: 'Entertainment', icon: 'film-outline', color: '#D4A5A5' },
+    { id: '6', name: 'Healthcare', icon: 'medical-outline', color: '#FF9999' },
+    { id: '7', name: 'Education', icon: 'school-outline', color: '#9DC8C8' },
+    { id: '8', name: 'Personal Care', icon: 'person-outline', color: '#58B19F' },
+];
+
 const TransactionsScreen = () => {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [activeFilter, setActiveFilter] = useState('All');
@@ -90,6 +111,17 @@ const TransactionsScreen = () => {
     const [transactionType, setTransactionType] = useState('INCOME');
     const [amount, setAmount] = useState('');
     const [notes, setNotes] = useState('');
+    const [expression, setExpression] = useState('');
+    const [calcError, setCalcError] = useState('');
+    const [selectedAccount, setSelectedAccount] = useState(accountOptions[0]);
+    const [isAccountModalVisible, setIsAccountModalVisible] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState(categoryOptions[0]);
+    const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
+    const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [isDateModalVisible, setIsDateModalVisible] = useState(false);
+    const [selectedTime, setSelectedTime] = useState(format(new Date(), 'HH:mm'));
+    const [isTimeModalVisible, setIsTimeModalVisible] = useState(false);
+    const [showYearPicker, setShowYearPicker] = useState(false);
 
     // Dummy data for demonstration
     const summaryData = {
@@ -126,18 +158,79 @@ const TransactionsScreen = () => {
         lastScrollY.current = currentScrollY;
     };
 
-    const handleNumberPress = (num: string) => {
-        if (amount.includes('.') && num === '.') return;
-        setAmount(prev => prev + num);
-    };
+    // Calculator logic
+    const operators = ['+', '-', '×', '÷'];
 
-    const handleDeletePress = () => {
-        setAmount(prev => prev.slice(0, -1));
+    const handleNumberPress = (num: string) => {
+        setCalcError('');
+        // Prevent multiple decimals in a number
+        const parts = expression.split(/\+|-|×|÷/);
+        const last = parts[parts.length - 1];
+        if (num === '.' && last.includes('.')) return;
+
+        // Handle initial zero
+        if (expression === '0') {
+            if (num === '.') {
+                setExpression('0.');
+            } else {
+                setExpression(num);
+            }
+            return;
+        }
+
+        setExpression(prev => prev + num);
     };
 
     const handleOperatorPress = (operator: string) => {
-        // Handle basic calculations if needed
-        console.log(operator);
+        setCalcError('');
+        if (!expression) return; // Don't allow operator at start
+        const lastChar = expression[expression.length - 1];
+        if (operators.includes(lastChar)) {
+            // Replace last operator
+            setExpression(prev => prev.slice(0, -1) + operator);
+        } else {
+            setExpression(prev => prev + operator);
+        }
+    };
+
+    const handleDeletePress = () => {
+        setCalcError('');
+        setExpression(prev => {
+            const newValue = prev.slice(0, -1);
+            // If expression becomes empty after deletion, set amount to '0'
+            if (!newValue) {
+                setAmount('0');
+                return '0';
+            }
+            return newValue;
+        });
+    };
+
+    const handleEvaluate = () => {
+        setCalcError('');
+        let exp = expression;
+        if (!exp) return;
+        // Replace custom operators with JS ones
+        exp = exp.replace(/×/g, '*').replace(/÷/g, '/');
+        // Prevent ending with operator
+        if (operators.includes(exp[exp.length - 1])) {
+            exp = exp.slice(0, -1);
+        }
+        try {
+            // eslint-disable-next-line no-eval
+            let result = eval(exp);
+            if (!isFinite(result)) {
+                setCalcError('Cannot divide by zero');
+                setAmount('');
+                return;
+            }
+            // Only allow positive numbers for amount
+            if (result < 0) result = Math.abs(result);
+            setAmount(result.toString());
+            setExpression(result.toString());
+        } catch (e) {
+            setCalcError('Invalid expression');
+        }
     };
 
     const renderTransaction = (transaction: Transaction) => (
@@ -170,12 +263,21 @@ const TransactionsScreen = () => {
         </Card>
     );
 
+    // Reset calculator when modal closes
+    const handleCloseModal = () => {
+        setIsModalVisible(false);
+        setExpression('');
+        setAmount('');
+        setCalcError('');
+    };
+
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { paddingBottom: 0 }]}>
             <ScrollView 
                 style={styles.scrollView}
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
+                contentContainerStyle={{ paddingBottom: spacing.xl }}
             >
                 {/* Month Navigation */}
                 <View style={styles.monthContainer}>
@@ -275,14 +377,15 @@ const TransactionsScreen = () => {
                 visible={isModalVisible}
                 animationType="slide"
                 transparent={true}
-                onRequestClose={() => setIsModalVisible(false)}
+                onRequestClose={handleCloseModal}
+                statusBarTranslucent={true}
             >
-                <View style={styles.modalContainer}>
+                <View style={styles.modalBackdrop}>
                     <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
                         {/* Header */}
                         <View style={styles.modalHeader}>
                             <TouchableOpacity 
-                                onPress={() => setIsModalVisible(false)}
+                                onPress={handleCloseModal}
                                 style={[styles.modalHeaderButton, styles.headerButtonLeft]}
                             >
                                 <Ionicons name="close-outline" size={24} color={colors.text} />
@@ -291,7 +394,7 @@ const TransactionsScreen = () => {
                             <TouchableOpacity 
                                 onPress={() => {
                                     // Handle save
-                                    setIsModalVisible(false);
+                                    handleCloseModal();
                                 }}
                                 style={[styles.modalHeaderButton, styles.headerButtonRight]}
                             >
@@ -323,13 +426,14 @@ const TransactionsScreen = () => {
 
                         {/* Account and Category Selectors */}
                         <View style={styles.selectorsContainer}>
-                            <TouchableOpacity style={styles.selector}>
-                                <Ionicons name="wallet-outline" size={24} color={colors.primary} />
-                                <Text style={styles.selectorText}>Account</Text>
+                            <TouchableOpacity style={styles.selector} onPress={() => setIsAccountModalVisible(true)}>
+                                <Ionicons name={selectedAccount.icon as any} size={24} color={colors.primary} />
+                                <Text style={styles.selectorText}>{selectedAccount.name}</Text>
+                                <Text style={[styles.selectorText, { marginLeft: 'auto' }]}>₹{selectedAccount.amount}</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.selector}>
-                                <Ionicons name="pricetag-outline" size={24} color={colors.primary} />
-                                <Text style={styles.selectorText}>Category</Text>
+                            <TouchableOpacity style={styles.selector} onPress={() => setIsCategoryModalVisible(true)}>
+                                <Ionicons name={selectedCategory.icon as any} size={24} color={selectedCategory.color} />
+                                <Text style={styles.selectorText}>{selectedCategory.name}</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -346,8 +450,11 @@ const TransactionsScreen = () => {
                         {/* Amount Display */}
                         <View style={styles.amountDisplay}>
                             <Text style={styles.displayText}>
-                                {amount || '0'}
+                                {expression || amount || '0'}
                             </Text>
+                            {!!calcError && (
+                                <Text style={{ color: 'red', fontSize: 12 }}>{calcError}</Text>
+                            )}
                         </View>
 
                         {/* Calculator Keypad */}
@@ -404,24 +511,278 @@ const TransactionsScreen = () => {
                                 <TouchableOpacity style={styles.keypadButton} onPress={handleDeletePress}>
                                     <Ionicons name="backspace-outline" size={24} color={colors.primary} />
                                 </TouchableOpacity>
-                                <TouchableOpacity style={[styles.keypadButton, styles.operatorButton]} onPress={() => handleOperatorPress('÷')}>
-                                    <Text style={styles.operatorButtonText}>÷</Text>
+                                <TouchableOpacity style={[styles.keypadButton, styles.operatorButton]} onPress={handleEvaluate}>
+                                    <Text style={styles.operatorButtonText}>=</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
 
                         {/* Date and Time Selector */}
                         <View style={styles.dateTimeContainer}>
-                            <TouchableOpacity style={styles.dateSelector}>
+                            <TouchableOpacity style={styles.dateSelector} onPress={() => setIsDateModalVisible(true)}>
                                 <Ionicons name="calendar-outline" size={24} color={colors.primary} />
-                                <Text style={styles.dateText}>{format(new Date(), 'MMM dd, yyyy')}</Text>
+                                <Text style={styles.dateText}>{format(new Date(selectedDate), 'MMM dd, yyyy')}</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.timeSelector}>
+                            <TouchableOpacity style={styles.timeSelector} onPress={() => setIsTimeModalVisible(true)}>
                                 <Ionicons name="time-outline" size={24} color={colors.primary} />
-                                <Text style={styles.timeText}>{format(new Date(), 'h:mm a')}</Text>
+                                <Text style={styles.timeText}>{format(new Date(`2020-01-01T${selectedTime}`), 'h:mm a')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
+                </View>
+            </Modal>
+
+            {/* Account Modal */}
+            <Modal
+                visible={isAccountModalVisible}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setIsAccountModalVisible(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-start' }}>
+                    <View style={{ margin: 24, marginTop: 60, backgroundColor: colors.background, borderRadius: 16, padding: 20 }}>
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>Select an account</Text>
+                        {accountOptions.map(acc => (
+                            <TouchableOpacity key={acc.key} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }} onPress={() => { setSelectedAccount(acc); setIsAccountModalVisible(false); }}>
+                                <Ionicons name={acc.icon as any} size={28} color={colors.primary} style={{ marginRight: 16 }} />
+                                <Text style={{ fontSize: 16, flex: 1 }}>{acc.name}</Text>
+                                <Text style={{ fontSize: 16, color: colors.textSecondary }}>₹{acc.amount}</Text>
+                            </TouchableOpacity>
+                        ))}
+                        <TouchableOpacity style={{ marginTop: 16, alignItems: 'center', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.primary }}>
+                            <Text style={{ color: colors.primary, fontWeight: 'bold' }}>+ Add new account</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Category Modal */}
+            <Modal
+                visible={isCategoryModalVisible}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setIsCategoryModalVisible(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' }}>
+                    <View style={{ margin: 24, marginBottom: 60, backgroundColor: colors.background, borderRadius: 16, padding: 20 }}>
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>Select a category</Text>
+                        {categoryOptions.map(cat => (
+                            <TouchableOpacity key={cat.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }} onPress={() => { setSelectedCategory(cat); setIsCategoryModalVisible(false); }}>
+                                <Ionicons name={cat.icon as any} size={28} color={cat.color} style={{ marginRight: 16 }} />
+                                <Text style={{ fontSize: 16 }}>{cat.name}</Text>
+                            </TouchableOpacity>
+                        ))}
+                        <TouchableOpacity style={{ marginTop: 16, alignItems: 'center', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.primary }}>
+                            <Text style={{ color: colors.primary, fontWeight: 'bold' }}>+ Add new category</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Date Picker Modal */}
+            <Modal
+                visible={isDateModalVisible}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setIsDateModalVisible(false)}
+            >
+                <View style={{ 
+                    flex: 1, 
+                    backgroundColor: 'rgba(0,0,0,0.5)', 
+                    justifyContent: 'center'
+                }}>
+                    <View style={{ 
+                        backgroundColor: colors.background,
+                        margin: 20,
+                        borderRadius: 16,
+                        padding: 20
+                    }}>
+                        {/* Year */}
+                        <TouchableOpacity 
+                            onPress={() => setShowYearPicker(true)}
+                            style={{
+                                alignItems: 'center',
+                                marginBottom: 8
+                            }}
+                        >
+                            <Text style={{ 
+                                fontSize: 24, 
+                                color: colors.text,
+                                textAlign: 'center',
+                            }}>
+                                {format(new Date(selectedDate), 'yyyy')}
+                                <Ionicons name="chevron-down" size={20} color={colors.text} style={{ marginLeft: 4 }} />
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Selected Date */}
+                        <Text style={{ 
+                            fontSize: 32, 
+                            color: colors.text,
+                            textAlign: 'center',
+                            marginBottom: 24,
+                            fontWeight: '300'
+                        }}>
+                            {format(new Date(selectedDate), 'EEE, MMM dd')}
+                        </Text>
+
+                        {/* Calendar Grid */}
+                        <Calendar 
+                            selected={selectedDate}
+                            onSelect={date => {
+                                // Preserve the selected year when changing dates
+                                const selectedYear = new Date(selectedDate).getFullYear();
+                                const newDate = new Date(date);
+                                newDate.setFullYear(selectedYear);
+                                setSelectedDate(format(newDate, 'yyyy-MM-dd'));
+                            }}
+                            style={{ backgroundColor: colors.background }}
+                            current={selectedDate}
+                            initialDate={selectedDate}
+                        />
+
+                        {/* Action Buttons */}
+                        <View style={{ 
+                            flexDirection: 'row', 
+                            justifyContent: 'space-between',
+                            marginTop: 24
+                        }}>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    // On cancel, revert to today's date
+                                    const today = format(new Date(), 'yyyy-MM-dd');
+                                    setSelectedDate(today);
+                                    setIsDateModalVisible(false);
+                                }}
+                                style={{
+                                    padding: 12,
+                                    flex: 1,
+                                    alignItems: 'center'
+                                }}
+                            >
+                                <Text style={{ 
+                                    color: colors.primary,
+                                    fontSize: 16,
+                                    fontWeight: '600'
+                                }}>
+                                    CANCEL
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    // On OK, keep the selected date
+                                    setIsDateModalVisible(false);
+                                }}
+                                style={{
+                                    padding: 12,
+                                    flex: 1,
+                                    alignItems: 'center'
+                                }}
+                            >
+                                <Text style={{ 
+                                    color: colors.primary,
+                                    fontSize: 16,
+                                    fontWeight: '600'
+                                }}>
+                                    OK
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Year Picker Modal */}
+            <Modal
+                visible={showYearPicker}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setShowYearPicker(false)}
+            >
+                <View style={{ 
+                    flex: 1, 
+                    backgroundColor: 'rgba(0,0,0,0.5)', 
+                    justifyContent: 'center'
+                }}>
+                    <View style={{ 
+                        backgroundColor: colors.background,
+                        margin: 20,
+                        borderRadius: 16,
+                        maxHeight: '70%'
+                    }}>
+                        <ScrollView>
+                            {Array.from({ length: 50 }, (_, i) => {
+                                const year = new Date().getFullYear() - 25 + i;
+                                const currentYear = new Date(selectedDate).getFullYear();
+                                return (
+                                    <TouchableOpacity
+                                        key={year}
+                                        style={{
+                                            padding: 16,
+                                            borderBottomWidth: 1,
+                                            borderBottomColor: colors.border,
+                                            alignItems: 'center',
+                                            backgroundColor: year === currentYear ? colors.secondary : 'transparent'
+                                        }}
+                                        onPress={() => {
+                                            // Create new date preserving the day and month
+                                            const currentDate = new Date(selectedDate);
+                                            const newDate = new Date(
+                                                year,
+                                                currentDate.getMonth(),
+                                                currentDate.getDate()
+                                            );
+                                            
+                                            // If the resulting date is invalid (e.g., Feb 31), adjust to last day of month
+                                            if (newDate.getMonth() !== currentDate.getMonth()) {
+                                                newDate.setDate(0); // Set to last day of previous month
+                                            }
+                                            
+                                            setSelectedDate(format(newDate, 'yyyy-MM-dd'));
+                                            setShowYearPicker(false);
+                                        }}
+                                    >
+                                        <Text style={{
+                                            fontSize: 18,
+                                            color: year === currentYear 
+                                                ? colors.primary 
+                                                : colors.text
+                                        }}>
+                                            {year}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Time Picker Modal */}
+            <Modal
+                visible={isTimeModalVisible}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setIsTimeModalVisible(false)}
+            >
+                <View style={{ 
+                    flex: 1, 
+                    backgroundColor: 'rgba(0,0,0,0.5)', 
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                }}>
+                    <TimePicker
+                        value={selectedTime}
+                        onChange={setSelectedTime}
+                        onCancel={() => {
+                            // Reset to current time when canceling
+                            setSelectedTime(format(new Date(), 'HH:mm'));
+                            setIsTimeModalVisible(false);
+                        }}
+                        onOk={() => {
+                            setIsTimeModalVisible(false);
+                        }}
+                    />
                 </View>
             </Modal>
         </SafeAreaView>
@@ -441,7 +802,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: spacing.xl,
-        paddingVertical: spacing.lg,
+        paddingBottom: spacing.lg,
     },
     monthArrow: {
         padding: spacing.sm,
@@ -582,14 +943,27 @@ const styles = StyleSheet.create({
     },
     modalContainer: {
         flex: 1,
+    },
+    modalBackdrop: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
     },
     modalContent: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         padding: spacing.md,
         paddingBottom: spacing.lg,
+        backgroundColor: colors.background,
+        maxHeight: '90%',
     },
     modalHeader: {
         flexDirection: 'row',

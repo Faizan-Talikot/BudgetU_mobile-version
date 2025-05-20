@@ -1,7 +1,8 @@
 import * as React from "react"
 import { View, StyleSheet } from "react-native"
 import { Calendar as RNCalendar } from "react-native-calendars"
-import { Feather } from "@expo/vector-icons"
+import type { CalendarProps as RNCalendarProps } from "react-native-calendars"
+import { colors } from "../../theme"
 
 interface CalendarProps {
   mode?: "single" | "multiple" | "range"
@@ -9,6 +10,9 @@ interface CalendarProps {
   onSelect?: (date: any) => void
   className?: string
   style?: any
+  theme?: RNCalendarProps["theme"]
+  current?: string
+  initialDate?: string
 }
 
 function Calendar({
@@ -17,6 +21,9 @@ function Calendar({
   onSelect,
   className,
   style,
+  theme: customTheme,
+  current,
+  initialDate,
   ...props
 }: CalendarProps) {
   const handleDayPress = (day: any) => {
@@ -25,39 +32,43 @@ function Calendar({
     }
   }
 
+  const defaultTheme = {
+    backgroundColor: colors.background,
+    calendarBackground: colors.background,
+    textSectionTitleColor: colors.textSecondary,
+    selectedDayBackgroundColor: colors.primary,
+    selectedDayTextColor: colors.background,
+    todayTextColor: colors.primary,
+    dayTextColor: colors.text,
+    textDisabledColor: colors.textSecondary,
+    arrowColor: colors.text,
+    monthTextColor: colors.text,
+    textDayFontWeight: "300" as const,
+    textMonthFontWeight: "500" as const,
+    textDayHeaderFontWeight: "300" as const,
+    textDayFontSize: 16,
+    textMonthFontSize: 18,
+    textDayHeaderFontSize: 14,
+  }
+
   return (
     <View style={[styles.container, style]}>
       <RNCalendar
         {...props}
+        current={current}
+        initialDate={initialDate}
         onDayPress={handleDayPress}
         markedDates={
           selected
             ? {
               [selected]: {
                 selected: true,
-                selectedColor: "#000",
+                selectedColor: colors.primary,
               },
             }
             : {}
         }
-        theme={{
-          backgroundColor: "#ffffff",
-          calendarBackground: "#ffffff",
-          textSectionTitleColor: "#666",
-          selectedDayBackgroundColor: "#000",
-          selectedDayTextColor: "#ffffff",
-          todayTextColor: "#000",
-          dayTextColor: "#2d4150",
-          textDisabledColor: "#d9e1e8",
-          arrowColor: "#000",
-          monthTextColor: "#000",
-          textDayFontWeight: "300",
-          textMonthFontWeight: "bold",
-          textDayHeaderFontWeight: "300",
-          textDayFontSize: 16,
-          textMonthFontSize: 16,
-          textDayHeaderFontSize: 14,
-        }}
+        theme={customTheme || defaultTheme}
       />
     </View>
   )
@@ -65,7 +76,7 @@ function Calendar({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.background,
     borderRadius: 8,
     overflow: "hidden",
   },

@@ -1,6 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerItem, DrawerContentComponentProps } from '@react-navigation/drawer';
+import {
+    createDrawerNavigator,
+    DrawerContentScrollView,
+    DrawerItemList,
+    DrawerItem,
+    DrawerContentComponentProps,
+    DrawerScreenProps,
+} from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing } from '../theme';
 import TabNavigator from './TabNavigator';
@@ -9,11 +16,7 @@ import { DrawerParamList } from './types';
 
 const Drawer = createDrawerNavigator<DrawerParamList>();
 
-interface CustomDrawerContentProps extends DrawerContentComponentProps {
-    // Add any additional props here
-}
-
-const CustomDrawerContent: React.FC<CustomDrawerContentProps> = (props) => {
+const CustomDrawerContent = (props: DrawerContentComponentProps) => {
     return (
         <DrawerContentScrollView {...props}>
             <View style={styles.drawerHeader}>
@@ -72,8 +75,8 @@ const CustomDrawerContent: React.FC<CustomDrawerContentProps> = (props) => {
 const DrawerNavigator = () => {
     return (
         <Drawer.Navigator
-            drawerContent={(props) => <CustomDrawerContent {...props} />}
-            screenOptions={({ navigation }) => ({
+            drawerContent={(props: DrawerContentComponentProps) => <CustomDrawerContent {...props} />}
+            screenOptions={({ navigation }: DrawerScreenProps<DrawerParamList>) => ({
                 headerShown: true,
                 headerTitle: 'BudgetU',
                 headerTitleStyle: styles.headerTitle,

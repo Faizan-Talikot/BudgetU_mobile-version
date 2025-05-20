@@ -4,6 +4,7 @@ export type TabParamList = {
     Dashboard: undefined;
     Budgets: undefined;
     Transactions: undefined;
+    Accounts: undefined;
     Categories: undefined;
 };
 
