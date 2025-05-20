@@ -1,4 +1,9 @@
-import { NavigatorScreenParams } from '@react-navigation/native';
+import { BudgetStackParamList } from './BudgetStackNavigator';
+
+type NavigatorScreenParams<T> = {
+    screen: keyof T;
+    params?: T[keyof T];
+};
 
 export type TabParamList = {
     Dashboard: undefined;
@@ -19,6 +24,7 @@ export type RootStackParamList = {
     SignUp: undefined;
     ForgotPassword: undefined;
     Main: NavigatorScreenParams<DrawerParamList>;
+    CreateBudget: NavigatorScreenParams<BudgetStackParamList>;
 };
 
 declare global {

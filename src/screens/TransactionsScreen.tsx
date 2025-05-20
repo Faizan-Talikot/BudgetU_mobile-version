@@ -33,12 +33,21 @@ const THEME = {
 // Define transaction type
 interface Transaction {
     id: string;
-    type: 'income' | 'expense';
+    type: 'income' | 'expense' | 'transfer';
     name: string;
     category: string;
     amount: number;
     date: string;
     time: string;
+}
+
+// Define category type
+interface Category {
+    id: string;
+    name: string;
+    icon: string;
+    color: string;
+    type: 'income' | 'expense' | 'transfer';
 }
 
 // Dummy transactions data grouped by date
@@ -85,21 +94,106 @@ const transactionsByDate: Record<string, Transaction[]> = {
     ],
 };
 
+const categories: Category[] = [
+    // Expense Categories
+    {
+        id: '1',
+        name: 'Food & Dining',
+        icon: 'restaurant-outline',
+        color: '#FF6B6B',
+        type: 'expense',
+    },
+    {
+        id: '2',
+        name: 'Transportation',
+        icon: 'car-outline',
+        color: '#4ECDC4',
+        type: 'expense',
+    },
+    {
+        id: '3',
+        name: 'Shopping',
+        icon: 'cart-outline',
+        color: '#45B7D1',
+        type: 'expense',
+    },
+    {
+        id: '4',
+        name: 'Bills & Utilities',
+        icon: 'receipt-outline',
+        color: '#96CEB4',
+        type: 'expense',
+    },
+    {
+        id: '5',
+        name: 'Entertainment',
+        icon: 'film-outline',
+        color: '#D4A5A5',
+        type: 'expense',
+    },
+    {
+        id: '6',
+        name: 'Healthcare',
+        icon: 'medical-outline',
+        color: '#FF9999',
+        type: 'expense',
+    },
+    {
+        id: '7',
+        name: 'Education',
+        icon: 'school-outline',
+        color: '#9DC8C8',
+        type: 'expense',
+    },
+    {
+        id: '8',
+        name: 'Personal Care',
+        icon: 'person-outline',
+        color: '#58B19F',
+        type: 'expense',
+    },
+    // Income Categories
+    {
+        id: '9',
+        name: 'Salary',
+        icon: 'cash-outline',
+        color: '#4CAF50',
+        type: 'income',
+    },
+    {
+        id: '10',
+        name: 'Business',
+        icon: 'briefcase-outline',
+        color: '#2196F3',
+        type: 'income',
+    },
+    {
+        id: '11',
+        name: 'Investments',
+        icon: 'trending-up-outline',
+        color: '#9C27B0',
+        type: 'income',
+    },
+    {
+        id: '12',
+        name: 'Gifts',
+        icon: 'gift-outline',
+        color: '#E91E63',
+        type: 'income',
+    },
+    {
+        id: '13',
+        name: 'Rental',
+        icon: 'home-outline',
+        color: '#FF9800',
+        type: 'income',
+    },
+];
+
 const accountOptions = [
     { key: 'cash', name: 'Cash', icon: 'cash-outline', amount: 0 },
     { key: 'upi', name: 'UPI', icon: 'phone-portrait-outline', amount: 0 },
     { key: 'saving', name: 'Saving', icon: 'wallet-outline', amount: 0 },
-];
-
-const categoryOptions = [
-    { id: '1', name: 'Food & Dining', icon: 'restaurant-outline', color: '#FF6B6B' },
-    { id: '2', name: 'Transportation', icon: 'car-outline', color: '#4ECDC4' },
-    { id: '3', name: 'Shopping', icon: 'cart-outline', color: '#45B7D1' },
-    { id: '4', name: 'Bills & Utilities', icon: 'receipt-outline', color: '#96CEB4' },
-    { id: '5', name: 'Entertainment', icon: 'film-outline', color: '#D4A5A5' },
-    { id: '6', name: 'Healthcare', icon: 'medical-outline', color: '#FF9999' },
-    { id: '7', name: 'Education', icon: 'school-outline', color: '#9DC8C8' },
-    { id: '8', name: 'Personal Care', icon: 'person-outline', color: '#58B19F' },
 ];
 
 const TransactionsScreen = () => {
@@ -115,13 +209,17 @@ const TransactionsScreen = () => {
     const [calcError, setCalcError] = useState('');
     const [selectedAccount, setSelectedAccount] = useState(accountOptions[0]);
     const [isAccountModalVisible, setIsAccountModalVisible] = useState(false);
-    const [selectedCategory, setSelectedCategory] = useState(categoryOptions[0]);
+    const [selectedCategory, setSelectedCategory] = useState<Category>(categories.find(cat => cat.type === 'income') || categories[0]);
     const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [isDateModalVisible, setIsDateModalVisible] = useState(false);
     const [selectedTime, setSelectedTime] = useState(format(new Date(), 'HH:mm'));
     const [isTimeModalVisible, setIsTimeModalVisible] = useState(false);
     const [showYearPicker, setShowYearPicker] = useState(false);
+    const [selectedFromAccount, setSelectedFromAccount] = useState(accountOptions[0]);
+    const [selectedToAccount, setSelectedToAccount] = useState(accountOptions[1]);
+    const [isFromAccountModalVisible, setIsFromAccountModalVisible] = useState(false);
+    const [isToAccountModalVisible, setIsToAccountModalVisible] = useState(false);
 
     // Dummy data for demonstration
     const summaryData = {
@@ -129,6 +227,19 @@ const TransactionsScreen = () => {
         income: 10500.00,
         total: 9900.00
     };
+
+    // Get filtered categories based on transaction type
+    const filteredCategories = categories.filter(
+        category => category.type === transactionType.toLowerCase()
+    );
+
+    // Update selected category when transaction type changes
+    React.useEffect(() => {
+        const defaultCategory = filteredCategories[0];
+        if (defaultCategory) {
+            setSelectedCategory(defaultCategory);
+        }
+    }, [transactionType]);
 
     const handlePreviousMonth = () => {
         setCurrentDate(prevDate => subMonths(prevDate, 1));
@@ -238,10 +349,10 @@ const TransactionsScreen = () => {
             <TouchableOpacity style={styles.transaction}>
                 <View style={[
                     styles.transactionIconContainer,
-                    transaction.type === 'expense' ? styles.expenseIcon : styles.incomeIcon
+                    transaction.type === 'expense' ? styles.expenseIcon : transaction.type === 'income' ? styles.incomeIcon : styles.transferIcon
                 ]}>
                     <Ionicons 
-                        name={transaction.type === 'expense' ? "arrow-down" : "arrow-up"} 
+                        name={transaction.type === 'expense' ? "arrow-down" : transaction.type === 'income' ? "arrow-up" : "swap-horizontal"} 
                         size={20} 
                         color={THEME.white}
                     />
@@ -253,9 +364,9 @@ const TransactionsScreen = () => {
                 <View style={styles.transactionAmount}>
                     <Text style={[
                         styles.amountText,
-                        transaction.type === 'expense' ? styles.expenseText : styles.incomeText
+                        transaction.type === 'expense' ? styles.expenseText : transaction.type === 'income' ? styles.incomeText : styles.transferText
                     ]}>
-                        {transaction.type === 'expense' ? '-' : '+'}₹{transaction.amount.toFixed(2)}
+                        {transaction.type === 'expense' ? '-' : transaction.type === 'income' ? '+' : ''}₹{transaction.amount.toFixed(2)}
                     </Text>
                     <Text style={styles.timeText}>{transaction.time}</Text>
                 </View>
@@ -269,6 +380,67 @@ const TransactionsScreen = () => {
         setExpression('');
         setAmount('');
         setCalcError('');
+    };
+
+    const renderAccountSelector = (
+        account: typeof accountOptions[0], 
+        onPress: () => void,
+        label: string
+    ) => (
+        <TouchableOpacity style={styles.selector} onPress={onPress}>
+            <Ionicons name={account.icon as any} size={24} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+                <Text style={[styles.selectorText, { fontSize: 12, color: colors.textSecondary }]}>{label}</Text>
+                <Text style={styles.selectorText}>{account.name}</Text>
+            </View>
+            <Text style={[styles.selectorText, { marginLeft: 'auto' }]}>₹{account.amount}</Text>
+        </TouchableOpacity>
+    );
+
+    const renderAccountsOrCategory = () => {
+        if (transactionType === 'TRANSFER') {
+            return (
+                <View style={styles.selectorsContainer}>
+                    {renderAccountSelector(
+                        selectedFromAccount,
+                        () => setIsFromAccountModalVisible(true),
+                        'From Account'
+                    )}
+                    <View style={styles.transferArrowContainer}>
+                        <Ionicons name="arrow-forward" size={20} color={colors.primary} />
+                    </View>
+                    {renderAccountSelector(
+                        selectedToAccount,
+                        () => setIsToAccountModalVisible(true),
+                        'To Account'
+                    )}
+                </View>
+            );
+        }
+
+        return (
+            <View style={styles.selectorsContainer}>
+                {renderAccountSelector(
+                    selectedAccount,
+                    () => setIsAccountModalVisible(true),
+                    'Account'
+                )}
+                <TouchableOpacity 
+                    style={styles.selector} 
+                    onPress={() => setIsCategoryModalVisible(true)}
+                >
+                    <Ionicons 
+                        name={selectedCategory.icon as any} 
+                        size={24} 
+                        color={selectedCategory.color} 
+                    />
+                    <View style={{ flex: 1 }}>
+                        <Text style={[styles.selectorText, { fontSize: 12, color: colors.textSecondary }]}>Category</Text>
+                        <Text style={styles.selectorText}>{selectedCategory.name}</Text>
+                    </View>
+                </TouchableOpacity>
+            </View>
+        );
     };
 
     return (
@@ -424,18 +596,8 @@ const TransactionsScreen = () => {
                             ))}
                         </View>
 
-                        {/* Account and Category Selectors */}
-                        <View style={styles.selectorsContainer}>
-                            <TouchableOpacity style={styles.selector} onPress={() => setIsAccountModalVisible(true)}>
-                                <Ionicons name={selectedAccount.icon as any} size={24} color={colors.primary} />
-                                <Text style={styles.selectorText}>{selectedAccount.name}</Text>
-                                <Text style={[styles.selectorText, { marginLeft: 'auto' }]}>₹{selectedAccount.amount}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.selector} onPress={() => setIsCategoryModalVisible(true)}>
-                                <Ionicons name={selectedCategory.icon as any} size={24} color={selectedCategory.color} />
-                                <Text style={styles.selectorText}>{selectedCategory.name}</Text>
-                            </TouchableOpacity>
-                        </View>
+                        {/* Account/Category Selectors */}
+                        {renderAccountsOrCategory()}
 
                         {/* Notes Input */}
                         <TextInput
@@ -565,15 +727,40 @@ const TransactionsScreen = () => {
             >
                 <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' }}>
                     <View style={{ margin: 24, marginBottom: 60, backgroundColor: colors.background, borderRadius: 16, padding: 20 }}>
-                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>Select a category</Text>
-                        {categoryOptions.map(cat => (
-                            <TouchableOpacity key={cat.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }} onPress={() => { setSelectedCategory(cat); setIsCategoryModalVisible(false); }}>
-                                <Ionicons name={cat.icon as any} size={28} color={cat.color} style={{ marginRight: 16 }} />
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
+                            Select {transactionType.toLowerCase()} category
+                        </Text>
+                        {filteredCategories.map((cat: Category) => (
+                            <TouchableOpacity 
+                                key={cat.id} 
+                                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }} 
+                                onPress={() => { 
+                                    setSelectedCategory(cat); 
+                                    setIsCategoryModalVisible(false); 
+                                }}
+                            >
+                                <Ionicons 
+                                    name={cat.icon as any} 
+                                    size={28} 
+                                    color={cat.color} 
+                                    style={{ marginRight: 16 }} 
+                                />
                                 <Text style={{ fontSize: 16 }}>{cat.name}</Text>
                             </TouchableOpacity>
                         ))}
-                        <TouchableOpacity style={{ marginTop: 16, alignItems: 'center', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.primary }}>
-                            <Text style={{ color: colors.primary, fontWeight: 'bold' }}>+ Add new category</Text>
+                        <TouchableOpacity 
+                            style={{ 
+                                marginTop: 16, 
+                                alignItems: 'center', 
+                                padding: 12, 
+                                borderRadius: 8, 
+                                borderWidth: 1, 
+                                borderColor: colors.primary 
+                            }}
+                        >
+                            <Text style={{ color: colors.primary, fontWeight: 'bold' }}>
+                                + Add new {transactionType.toLowerCase()} category
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -785,6 +972,62 @@ const TransactionsScreen = () => {
                     />
                 </View>
             </Modal>
+
+            {/* From Account Modal */}
+            <Modal
+                visible={isFromAccountModalVisible}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setIsFromAccountModalVisible(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-start' }}>
+                    <View style={{ margin: 24, marginTop: 60, backgroundColor: colors.background, borderRadius: 16, padding: 20 }}>
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>Select from account</Text>
+                        {accountOptions.filter(acc => acc.key !== selectedToAccount.key).map(acc => (
+                            <TouchableOpacity 
+                                key={acc.key} 
+                                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }} 
+                                onPress={() => { 
+                                    setSelectedFromAccount(acc); 
+                                    setIsFromAccountModalVisible(false); 
+                                }}
+                            >
+                                <Ionicons name={acc.icon as any} size={28} color={colors.primary} style={{ marginRight: 16 }} />
+                                <Text style={{ fontSize: 16, flex: 1 }}>{acc.name}</Text>
+                                <Text style={{ fontSize: 16, color: colors.textSecondary }}>₹{acc.amount}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* To Account Modal */}
+            <Modal
+                visible={isToAccountModalVisible}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setIsToAccountModalVisible(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-start' }}>
+                    <View style={{ margin: 24, marginTop: 60, backgroundColor: colors.background, borderRadius: 16, padding: 20 }}>
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>Select to account</Text>
+                        {accountOptions.filter(acc => acc.key !== selectedFromAccount.key).map(acc => (
+                            <TouchableOpacity 
+                                key={acc.key} 
+                                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }} 
+                                onPress={() => { 
+                                    setSelectedToAccount(acc); 
+                                    setIsToAccountModalVisible(false); 
+                                }}
+                            >
+                                <Ionicons name={acc.icon as any} size={28} color={colors.primary} style={{ marginRight: 16 }} />
+                                <Text style={{ fontSize: 16, flex: 1 }}>{acc.name}</Text>
+                                <Text style={{ fontSize: 16, color: colors.textSecondary }}>₹{acc.amount}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -903,6 +1146,9 @@ const styles = StyleSheet.create({
     },
     incomeIcon: {
         backgroundColor: '#059669',
+    },
+    transferIcon: {
+        backgroundColor: '#FF9800',
     },
     transactionInfo: {
         flex: 1,
@@ -1125,6 +1371,20 @@ const styles = StyleSheet.create({
         color: colors.text,
         marginBottom: spacing.md,
         marginTop: spacing.lg,
+    },
+    transferArrowContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.secondary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        alignSelf: 'center',
+        marginHorizontal: -10,
+        zIndex: 1,
+    },
+    transferText: {
+        color: '#FF9800', // Using orange color for transfer transactions
     },
 });
 

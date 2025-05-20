@@ -8,6 +8,7 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
+import BudgetStackNavigator from './BudgetStackNavigator';
 import { storage, StorageKeys } from '../utils/storage';
 import { RootStackParamList } from './types';
 
@@ -61,6 +62,7 @@ export const Navigation = () => {
                     <Stack.Screen name="SignUp" component={SignUpScreen} />
                     <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
                     <Stack.Screen name="Main" component={DrawerNavigator} />
+                    <Stack.Screen name="CreateBudget" component={BudgetStackNavigator} />
                 </Stack.Group>
             </Stack.Navigator>
         </NavigationContainer>
