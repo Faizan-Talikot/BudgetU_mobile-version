@@ -7,6 +7,8 @@ export const StorageKeys = {
     SETTINGS: '@BudgetU:settings',
     PENDING_SYNC: '@BudgetU:pendingSync',
     HAS_SEEN_ONBOARDING: '@BudgetU:hasSeenOnboarding',
+    CATEGORIES: '@BudgetU:categories',
+    ACCOUNTS: '@BudgetU:accounts',
 } as const;
 
 type StorageListener = () => void | Promise<void>;

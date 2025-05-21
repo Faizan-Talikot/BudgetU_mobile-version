@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     TouchableOpacity,
     ScrollView,
+    Modal,
+    TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing, borderRadius, shadows } from '../theme';
+import { colors, typography, spacing, borderRadius } from '../theme';
+import { storage, StorageKeys } from '../utils/storage';
 
 interface Account {
     id: string;
@@ -18,40 +21,223 @@ interface Account {
     icon: string;
 }
 
-const accounts: Account[] = [
-    { id: '1', type: 'upi', name: 'UPI', balance: -47284.00, icon: 'phone-portrait-outline' },
-    { id: '2', type: 'cash', name: 'Cash', balance: -51221.00, icon: 'cash-outline' },
-    { id: '3', type: 'savings', name: 'Savings', balance: 0.00, icon: 'wallet-outline' },
+// Available account icons
+const accountIcons = [
+    { icon: 'cash-outline', name: 'Cash' },
+    { icon: 'card-outline', name: 'Card' },
+    { icon: 'wallet-outline', name: 'Wallet' },
+    { icon: 'phone-portrait-outline', name: 'UPI' },
+    { icon: 'card-outline', name: 'Credit Card' },
+];
+
+// Default accounts
+const defaultAccounts: Account[] = [
+    { id: '1', type: 'upi', name: 'UPI', balance: 0, icon: 'phone-portrait-outline' },
+    { id: '2', type: 'cash', name: 'Cash', balance: 0, icon: 'cash-outline' },
+    { id: '3', type: 'savings', name: 'Savings', balance: 0, icon: 'wallet-outline' },
 ];
 
 const AccountsScreen = () => {
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [isModalVisible, setIsModalVisible] = useState(false);
+    const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+    const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+    const [newAccountName, setNewAccountName] = useState('');
+    const [selectedIcon, setSelectedIcon] = useState(accountIcons[0].icon);
+    const [initialAmount, setInitialAmount] = useState('0');
+
+    useEffect(() => {
+        loadAccounts();
+    }, []);
+
+    const loadAccounts = async () => {
+        try {
+            const savedAccounts = await storage.get<Account[]>(StorageKeys.ACCOUNTS);
+            if (savedAccounts) {
+                setAccounts(savedAccounts);
+            } else {
+                // If no saved accounts, use defaults
+                setAccounts(defaultAccounts);
+                await storage.set(StorageKeys.ACCOUNTS, defaultAccounts);
+            }
+        } catch (error) {
+            console.error('Error loading accounts:', error);
+        }
+    };
+
+    const saveAccounts = async (updatedAccounts: Account[]) => {
+        try {
+            await storage.set(StorageKeys.ACCOUNTS, updatedAccounts);
+        } catch (error) {
+            console.error('Error saving accounts:', error);
+        }
+    };
+
+    const handleAddAccount = async () => {
+        if (newAccountName.trim()) {
+            const newAccount: Account = {
+                id: `account_${Date.now()}`,
+                type: 'savings',
+                name: newAccountName.trim(),
+                balance: parseFloat(initialAmount) || 0,
+                icon: selectedIcon,
+            };
+
+            const updatedAccounts = [...accounts, newAccount];
+            setAccounts(updatedAccounts);
+            await saveAccounts(updatedAccounts);
+            resetModalState();
+        }
+    };
+
+    const handleEditAccount = async () => {
+        if (!editingAccount || !newAccountName.trim()) return;
+
+        const updatedAccount = {
+            ...editingAccount,
+            name: newAccountName.trim(),
+            icon: selectedIcon,
+            balance: parseFloat(initialAmount) || editingAccount.balance,
+        };
+
+        const updatedAccounts = accounts.map(acc =>
+            acc.id === editingAccount.id ? updatedAccount : acc
+        );
+
+        setAccounts(updatedAccounts);
+        await saveAccounts(updatedAccounts);
+        resetModalState();
+    };
+
+    const handleDeleteAccount = async () => {
+        if (!editingAccount) return;
+
+        const updatedAccounts = accounts.filter(acc => acc.id !== editingAccount.id);
+        setAccounts(updatedAccounts);
+        await saveAccounts(updatedAccounts);
+        resetModalState();
+    };
+
+    const resetModalState = () => {
+        setNewAccountName('');
+        setSelectedIcon(accountIcons[0].icon);
+        setInitialAmount('0');
+        setIsModalVisible(false);
+        setIsEditModalVisible(false);
+        setEditingAccount(null);
+    };
+
+    const handleAccountPress = (account: Account) => {
+        setEditingAccount(account);
+        setNewAccountName(account.name);
+        setSelectedIcon(account.icon);
+        setInitialAmount(account.balance.toString());
+        setIsEditModalVisible(true);
+    };
+
     const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
     const totalExpense = accounts.reduce((sum, account) => sum + (account.balance < 0 ? -account.balance : 0), 0);
     const totalIncome = accounts.reduce((sum, account) => sum + (account.balance > 0 ? account.balance : 0), 0);
 
-    const renderAccount = (account: Account) => (
-        <TouchableOpacity 
-            key={account.id}
-            style={styles.accountCard}
+    const renderAccountModal = (isEdit: boolean) => (
+        <Modal
+            visible={isEdit ? isEditModalVisible : isModalVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={resetModalState}
         >
-            <View style={styles.accountInfo}>
-                <View style={styles.accountIconContainer}>
-                    <Ionicons name={account.icon as any} size={24} color={colors.primary} />
+            <View style={styles.modalContainer}>
+                <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>
+                            {isEdit ? 'Edit account' : 'Add new account'}
+                        </Text>
+                        <TouchableOpacity 
+                            onPress={resetModalState}
+                            style={styles.closeButton}
+                        >
+                            <Ionicons name="close" size={24} color={colors.text} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Initial Amount Input */}
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.modalLabel}>Initial amount</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="0"
+                            value={initialAmount}
+                            onChangeText={setInitialAmount}
+                            keyboardType="numeric"
+                            placeholderTextColor={colors.textSecondary}
+                        />
+                        <Text style={styles.helperText}>
+                            *Initial amount will not be reflected in analysis
+                        </Text>
+                    </View>
+
+                    {/* Account Name Input */}
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.modalLabel}>Name</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter account name"
+                            value={newAccountName}
+                            onChangeText={setNewAccountName}
+                            placeholderTextColor={colors.textSecondary}
+                        />
+                    </View>
+
+                    {/* Icon Selection */}
+                    <View style={styles.iconSection}>
+                        <Text style={styles.modalLabel}>Icon</Text>
+                        <View style={styles.iconGrid}>
+                            {accountIcons.map((item, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={[
+                                        styles.iconOption,
+                                        selectedIcon === item.icon && styles.selectedIconOption
+                                    ]}
+                                    onPress={() => setSelectedIcon(item.icon)}
+                                >
+                                    <Ionicons
+                                        name={item.icon as any}
+                                        size={24}
+                                        color={selectedIcon === item.icon ? colors.background : colors.text}
+                                    />
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+
+                    {/* Action Buttons */}
+                    <View style={styles.modalActions}>
+                        {isEdit && (
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.deleteButton]}
+                                onPress={handleDeleteAccount}
+                            >
+                                <Text style={styles.deleteButtonText}>DELETE</Text>
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                            style={[styles.modalButton, styles.cancelButton]}
+                            onPress={resetModalState}
+                        >
+                            <Text style={styles.cancelButtonText}>CANCEL</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.modalButton, styles.saveButton]}
+                            onPress={isEdit ? handleEditAccount : handleAddAccount}
+                            disabled={!newAccountName.trim()}
+                        >
+                            <Text style={styles.saveButtonText}>SAVE</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
-                <View style={styles.accountDetails}>
-                    <Text style={styles.accountName}>{account.name}</Text>
-                    <Text style={[
-                        styles.accountBalance,
-                        account.balance < 0 ? styles.negativeBalance : styles.positiveBalance
-                    ]}>
-                        {account.balance < 0 ? '-' : ''}₹{Math.abs(account.balance).toFixed(2)}
-                    </Text>
-                </View>
-                <TouchableOpacity style={styles.menuButton}>
-                    <Ionicons name="ellipsis-horizontal" size={24} color={colors.text} />
-                </TouchableOpacity>
             </View>
-        </TouchableOpacity>
+        </Modal>
     );
 
     return (
@@ -83,21 +269,46 @@ const AccountsScreen = () => {
                 <View style={styles.accountsSection}>
                     <Text style={styles.sectionTitle}>Accounts</Text>
                     <View style={styles.accountsList}>
-                        {accounts.map(renderAccount)}
+                        {accounts.map((account) => (
+                            <TouchableOpacity
+                                key={account.id}
+                                onPress={() => handleAccountPress(account)}
+                                style={styles.accountCard}
+                            >
+                                <View style={styles.accountInfo}>
+                                    <View style={styles.accountIconContainer}>
+                                        <Ionicons name={account.icon as any} size={24} color={colors.primary} />
+                                    </View>
+                                    <View style={styles.accountDetails}>
+                                        <Text style={styles.accountName}>{account.name}</Text>
+                                        <Text style={[
+                                            styles.accountBalance,
+                                            account.balance < 0 ? styles.negativeBalance : styles.positiveBalance
+                                        ]}>
+                                            {account.balance < 0 ? '-' : ''}₹{Math.abs(account.balance).toFixed(2)}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        ))}
                     </View>
                     
                     {/* Add New Account Button */}
-                    <TouchableOpacity style={styles.addAccountButton}>
+                    <TouchableOpacity 
+                        style={styles.addAccountButton}
+                        onPress={() => setIsModalVisible(true)}
+                    >
                         <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
                         <Text style={styles.addAccountText}>ADD NEW ACCOUNT</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
 
-            {/* Floating Action Button */}
-            <TouchableOpacity style={styles.fab}>
-                <Ionicons name="add" size={24} color={colors.background} />
-            </TouchableOpacity>
+            {/* Add Account Modal */}
+            {renderAccountModal(false)}
+
+            {/* Edit Account Modal */}
+            {renderAccountModal(true)}
         </SafeAreaView>
     );
 };
@@ -112,7 +323,7 @@ const styles = StyleSheet.create({
     },
     balanceContainer: {
         alignItems: 'center',
-        paddingBottom: spacing.xl,
+        paddingVertical: spacing.xl,
     },
     balanceTitle: {
         fontSize: typography.sizes.lg,
@@ -134,7 +345,6 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: spacing.lg,
         borderRadius: borderRadius.lg,
-        backgroundColor: colors.secondary,
     },
     expenseCard: {
         backgroundColor: '#FEE2E2',
@@ -206,9 +416,6 @@ const styles = StyleSheet.create({
     positiveBalance: {
         color: '#059669',
     },
-    menuButton: {
-        padding: spacing.xs,
-    },
     addAccountButton: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -225,17 +432,106 @@ const styles = StyleSheet.create({
         fontSize: typography.sizes.base,
         fontWeight: typography.weights.medium,
     },
-    fab: {
-        position: 'absolute',
-        right: spacing.xl,
-        bottom: spacing.xl,
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: colors.primary,
+    modalContainer: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+    },
+    modalContent: {
+        backgroundColor: colors.background,
+        margin: spacing.lg,
+        borderRadius: borderRadius.xl,
+        padding: spacing.xl,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.xl,
+    },
+    modalTitle: {
+        fontSize: typography.sizes.xl,
+        fontWeight: typography.weights.bold,
+        color: colors.text,
+    },
+    closeButton: {
+        padding: spacing.xs,
+    },
+    inputContainer: {
+        marginBottom: spacing.lg,
+    },
+    modalLabel: {
+        fontSize: typography.sizes.base,
+        fontWeight: typography.weights.medium,
+        color: colors.text,
+        marginBottom: spacing.sm,
+    },
+    input: {
+        backgroundColor: colors.secondary,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        fontSize: typography.sizes.base,
+        color: colors.text,
+    },
+    helperText: {
+        fontSize: typography.sizes.sm,
+        color: colors.textSecondary,
+        marginTop: spacing.xs,
+    },
+    iconSection: {
+        marginBottom: spacing.xl,
+    },
+    iconGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.md,
+    },
+    iconOption: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: colors.secondary,
         justifyContent: 'center',
         alignItems: 'center',
-        ...shadows.lg,
+    },
+    selectedIconOption: {
+        backgroundColor: colors.primary,
+    },
+    modalActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: spacing.md,
+    },
+    modalButton: {
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.lg,
+        borderRadius: borderRadius.lg,
+        minWidth: 100,
+        alignItems: 'center',
+    },
+    deleteButton: {
+        backgroundColor: '#FEE2E2',
+    },
+    deleteButtonText: {
+        color: '#DC2626',
+        fontSize: typography.sizes.base,
+        fontWeight: typography.weights.medium,
+    },
+    cancelButton: {
+        backgroundColor: colors.secondary,
+    },
+    saveButton: {
+        backgroundColor: colors.primary,
+    },
+    cancelButtonText: {
+        color: colors.text,
+        fontSize: typography.sizes.base,
+        fontWeight: typography.weights.medium,
+    },
+    saveButtonText: {
+        color: colors.background,
+        fontSize: typography.sizes.base,
+        fontWeight: typography.weights.medium,
     },
 });
 
