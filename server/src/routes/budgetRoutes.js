@@ -1,26 +1,43 @@
 const express = require('express');
 const router = express.Router();
-const budgetController = require('../controllers/budgetController');
 const { authenticate } = require('../middleware/auth');
+const {
+    getBudgets,
+    getBudget,
+    createBudget,
+    updateBudget,
+    deleteBudget,
+    getActiveBudgets,
+    updateBudgetStatus,
+    getBudgetSummary
+} = require('../controllers/budgetController');
 
-// All budget routes require authentication
-router.use(authenticate);
+// Debug log to check imported functions
+console.log('Imported functions:', {
+    getBudgets: !!getBudgets,
+    getBudget: !!getBudget,
+    createBudget: !!createBudget,
+    updateBudget: !!updateBudget,
+    deleteBudget: !!deleteBudget,
+    getActiveBudgets: !!getActiveBudgets,
+    updateBudgetStatus: !!updateBudgetStatus,
+    getBudgetSummary: !!getBudgetSummary
+});
 
-// Budget routes
-router.get('/', budgetController.getBudgets);
-router.get('/active', budgetController.getActiveBudgets);
-router.get('/:id', budgetController.getBudgetById);
-router.get('/:id/summary', budgetController.getBudgetSummary);
-router.post('/', budgetController.createBudget);
-router.put('/:id', budgetController.updateBudget);
-router.delete('/:id', budgetController.deleteBudget);
+// Get all budgets (non-parameterized route first)
+router.get('/', authenticate, getBudgets);
 
-// Budget category routes
-router.post('/:id/categories', budgetController.addBudgetCategory);
-router.put('/:id/categories', budgetController.updateBudgetCategory);
-router.delete('/:id/categories/:categoryId', budgetController.deleteBudgetCategory);
+// Get active budgets (non-parameterized route)
+router.get('/active', authenticate, getActiveBudgets);
 
-// Recurring budget route
-router.post('/:id/recurring', budgetController.createRecurringBudget);
+// Create new budget (non-parameterized route)
+router.post('/', authenticate, createBudget);
+
+// Routes with parameters
+router.get('/:id', authenticate, getBudget);
+router.get('/:id/summary', authenticate, getBudgetSummary);
+router.put('/:id', authenticate, updateBudget);
+router.delete('/:id', authenticate, deleteBudget);
+router.patch('/:id/status', authenticate, updateBudgetStatus);
 
 module.exports = router; 

@@ -56,18 +56,29 @@ const CreateBudgetReview: React.FC = () => {
     const durationInDays = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     const dailyBudget = totalBudget / durationInDays;
 
-    const handleCreateBudget = () => {
-        // Navigate to success screen
+    const handleContinue = () => {
+        console.log('Review screen passing data:', {
+            amount: totalBudget,
+            name: budgetName,
+            startDate,
+            endDate,
+            unallocatedAmount,
+            categories,
+            saveAsTemplate,
+            enableReminders,
+            existingIncome: route.params.existingIncome
+        });
+
         navigation.navigate('CreateBudgetSuccess', {
             amount: totalBudget,
             name: budgetName,
             startDate,
             endDate,
-            categories,
-            incomeSources,
             unallocatedAmount,
+            categories,
             saveAsTemplate,
             enableReminders,
+            existingIncome: route.params.existingIncome
         });
     };
 
@@ -90,6 +101,14 @@ const CreateBudgetReview: React.FC = () => {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Budget Overview</Text>
                     <View style={styles.budgetCard}>
+                        {route.params.existingIncome > 0 && (
+                            <View style={styles.budgetRow}>
+                                <Text style={styles.budgetLabel}>Total Income</Text>
+                                <Text style={[styles.budgetValue, { color: colors.success }]}>
+                                    ₹{route.params.existingIncome.toLocaleString()}
+                                </Text>
+                            </View>
+                        )}
                         <View style={styles.budgetRow}>
                             <Text style={styles.budgetLabel}>Total Budget</Text>
                             <Text style={styles.budgetValue}>₹{totalBudget.toLocaleString()}</Text>
@@ -155,7 +174,7 @@ const CreateBudgetReview: React.FC = () => {
             <View style={styles.footer}>
                 <Button
                     variant="primary"
-                    onPress={handleCreateBudget}
+                    onPress={handleContinue}
                     fullWidth
                 >
                     Create Budget

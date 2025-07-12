@@ -21,5 +21,9 @@ export default {
       backgroundColor: '#1B3A4B'
     },
     package: 'com.budgetu.app'
+  },
+  extra: {
+    NODE_ENV: process.env.NODE_ENV || 'development',
+    API_URL: process.env.API_URL || 'http://localhost:5000/api'
   }
 }; 

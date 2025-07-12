@@ -4,15 +4,32 @@ import { Calendar as RNCalendar } from "react-native-calendars"
 import type { CalendarProps as RNCalendarProps } from "react-native-calendars"
 import { colors } from "../../theme"
 
-interface CalendarProps {
+export interface CalendarProps {
   mode?: "single" | "multiple" | "range"
-  selected?: any
-  onSelect?: (date: any) => void
+  selected?: string
+  onSelect?: (date: string) => void
   className?: string
   style?: any
   theme?: RNCalendarProps["theme"]
   current?: string
   initialDate?: string
+  markedDates?: Record<string, {
+    selected?: boolean;
+    marked?: boolean;
+    dotColor?: string;
+    disabled?: boolean;
+    disableTouchEvent?: boolean;
+    customStyles?: {
+      container?: {
+        backgroundColor?: string;
+      };
+      text?: {
+        color?: string;
+      };
+    };
+  }>
+  markingType?: "dot" | "multi-dot" | "period" | "multi-period" | "custom"
+  minDate?: string
 }
 
 function Calendar({
@@ -24,6 +41,9 @@ function Calendar({
   theme: customTheme,
   current,
   initialDate,
+  markedDates,
+  markingType = "dot",
+  minDate,
   ...props
 }: CalendarProps) {
   const handleDayPress = (day: any) => {
@@ -49,6 +69,8 @@ function Calendar({
     textDayFontSize: 16,
     textMonthFontSize: 18,
     textDayHeaderFontSize: 14,
+    dotColor: colors.primary,
+    selectedDotColor: colors.background,
   }
 
   return (
@@ -58,17 +80,15 @@ function Calendar({
         current={current}
         initialDate={initialDate}
         onDayPress={handleDayPress}
-        markedDates={
-          selected
-            ? {
-              [selected]: {
-                selected: true,
-                selectedColor: colors.primary,
-              },
-            }
-            : {}
-        }
+        markedDates={markedDates || (selected ? {
+          [selected]: {
+            selected: true,
+            selectedColor: colors.primary,
+          },
+        } : {})}
+        markingType={markingType}
         theme={customTheme || defaultTheme}
+        minDate={minDate}
       />
     </View>
   )

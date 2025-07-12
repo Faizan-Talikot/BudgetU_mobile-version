@@ -1,10 +1,44 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../middleware/auth');
+const Account = require('../models/Account');
+
+// Default accounts to create for new users
+const defaultAccounts = [
+  { type: 'cash', name: 'Cash', icon: 'cash-outline', isDefault: true },
+  { type: 'savings', name: 'Savings', icon: 'wallet-outline', isDefault: true },
+  { type: 'upi', name: 'UPI', icon: 'phone-portrait-outline', isDefault: true },
+  { type: 'card', name: 'Debit Card', icon: 'card-outline', isDefault: true },
+  { type: 'credit', name: 'Credit Card', icon: 'card-outline', isDefault: true }
+];
+
+// Helper function to create default accounts
+async function createDefaultsForUser(userId) {
+  try {
+    console.log('Starting to create defaults for user:', userId);
+    
+    // Create default accounts
+    const accountPromises = defaultAccounts.map(account => 
+      new Account({
+        ...account,
+        user: userId,
+        balance: 0
+      }).save()
+    );
+
+    // Wait for all defaults to be created
+    await Promise.all(accountPromises);
+    console.log('Successfully created defaults for user:', userId);
+  } catch (error) {
+    console.error('Error creating defaults:', error);
+    throw error;
+  }
+}
 
 // Register a new user
 const register = async (req, res) => {
   try {
+    console.log('Starting user registration process');
     const { firstName, lastName, email, password } = req.body;
 
     // Check if user already exists
@@ -22,7 +56,13 @@ const register = async (req, res) => {
     });
 
     // Save user to database
+    console.log('Saving new user to database');
     await newUser.save();
+    console.log('User saved successfully with ID:', newUser._id);
+
+    // Create default accounts
+    console.log('Creating default accounts');
+    await createDefaultsForUser(newUser._id);
 
     // Generate JWT token
     const token = jwt.sign({ userId: newUser._id }, JWT_SECRET, { expiresIn: '7d' });
@@ -39,6 +79,7 @@ const register = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Registration error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

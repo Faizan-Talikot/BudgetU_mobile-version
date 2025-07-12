@@ -11,6 +11,8 @@ dotenv.config();
 const userRoutes = require('./routes/userRoutes');
 const budgetRoutes = require('./routes/budgetRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
+const accountRoutes = require('./routes/accountRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
 
 // Create Express app
 const app = express();
@@ -55,6 +57,8 @@ connectToDatabase().catch(err => console.error('MongoDB connection error:', err)
 app.use('/api/users', userRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/transactions', transactionRoutes);
+app.use('/api/accounts', accountRoutes);
+app.use('/api/categories', categoryRoutes);
 
 // Base route
 app.get('/', (req, res) => {

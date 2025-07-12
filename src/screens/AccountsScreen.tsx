@@ -7,19 +7,14 @@ import {
     ScrollView,
     Modal,
     TextInput,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius } from '../theme';
-import { storage, StorageKeys } from '../utils/storage';
-
-interface Account {
-    id: string;
-    type: 'upi' | 'cash' | 'savings';
-    name: string;
-    balance: number;
-    icon: string;
-}
+import { accountAPI, type Account } from '../services/api';
+import { AxiosError } from 'axios';
 
 // Available account icons
 const accountIcons = [
@@ -30,14 +25,7 @@ const accountIcons = [
     { icon: 'card-outline', name: 'Credit Card' },
 ];
 
-// Default accounts
-const defaultAccounts: Account[] = [
-    { id: '1', type: 'upi', name: 'UPI', balance: 0, icon: 'phone-portrait-outline' },
-    { id: '2', type: 'cash', name: 'Cash', balance: 0, icon: 'cash-outline' },
-    { id: '3', type: 'savings', name: 'Savings', balance: 0, icon: 'wallet-outline' },
-];
-
-const AccountsScreen = () => {
+const AccountsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -45,83 +33,109 @@ const AccountsScreen = () => {
     const [newAccountName, setNewAccountName] = useState('');
     const [selectedIcon, setSelectedIcon] = useState(accountIcons[0].icon);
     const [initialAmount, setInitialAmount] = useState('0');
+    const [loading, setLoading] = useState(false);
+    const [selectedType, setSelectedType] = useState<Account['type']>('savings');
+    const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     useEffect(() => {
-        loadAccounts();
-    }, []);
+        // Load accounts initially and on every focus
+        const unsubscribe = navigation.addListener('focus', loadAccounts);
+        return unsubscribe;
+    }, [navigation]);
 
     const loadAccounts = async () => {
         try {
-            const savedAccounts = await storage.get<Account[]>(StorageKeys.ACCOUNTS);
-            if (savedAccounts) {
-                setAccounts(savedAccounts);
-            } else {
-                // If no saved accounts, use defaults
-                setAccounts(defaultAccounts);
-                await storage.set(StorageKeys.ACCOUNTS, defaultAccounts);
-            }
+            setIsLoading(true);
+            const fetchedAccounts = await accountAPI.getAll();
+            setAccounts(fetchedAccounts);
         } catch (error) {
             console.error('Error loading accounts:', error);
+            Alert.alert('Error', 'Failed to load accounts');
+        } finally {
+            setIsLoading(false);
+            setIsRefreshing(false);
         }
     };
 
-    const saveAccounts = async (updatedAccounts: Account[]) => {
-        try {
-            await storage.set(StorageKeys.ACCOUNTS, updatedAccounts);
-        } catch (error) {
-            console.error('Error saving accounts:', error);
-        }
+    const handleRefresh = () => {
+        setIsRefreshing(true);
+        loadAccounts();
     };
 
     const handleAddAccount = async () => {
-        if (newAccountName.trim()) {
-            const newAccount: Account = {
-                id: `account_${Date.now()}`,
-                type: 'savings',
-                name: newAccountName.trim(),
+        try {
+            setLoading(true);
+            const newAccount = await accountAPI.create({
+                type: selectedType,
+                name: newAccountName,
                 balance: parseFloat(initialAmount) || 0,
                 icon: selectedIcon,
-            };
-
-            const updatedAccounts = [...accounts, newAccount];
-            setAccounts(updatedAccounts);
-            await saveAccounts(updatedAccounts);
-            resetModalState();
+                isDefault: false
+            });
+            setAccounts([...accounts, newAccount]);
+            setIsModalVisible(false);
+            setNewAccountName('');
+            setInitialAmount('0');
+            setSelectedIcon(accountIcons[0].icon);
+        } catch (error) {
+            console.error('Error creating account:', error);
+            Alert.alert('Error', 'Failed to create account');
+        } finally {
+            setLoading(false);
         }
     };
 
     const handleEditAccount = async () => {
         if (!editingAccount || !newAccountName.trim()) return;
 
-        const updatedAccount = {
-            ...editingAccount,
-            name: newAccountName.trim(),
-            icon: selectedIcon,
-            balance: parseFloat(initialAmount) || editingAccount.balance,
-        };
+        try {
+            setLoading(true);
+            const updatedAccount = await accountAPI.update(editingAccount._id, {
+                type: selectedType,
+                name: newAccountName.trim(),
+                icon: selectedIcon,
+            });
 
-        const updatedAccounts = accounts.map(acc =>
-            acc.id === editingAccount.id ? updatedAccount : acc
-        );
-
-        setAccounts(updatedAccounts);
-        await saveAccounts(updatedAccounts);
-        resetModalState();
+            setAccounts(accounts.map(acc =>
+                acc._id === editingAccount._id ? updatedAccount : acc
+            ));
+            resetModalState();
+            Alert.alert('Success', 'Account updated successfully');
+        } catch (error) {
+            Alert.alert('Error', 'Failed to update account');
+            console.error('Error updating account:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleDeleteAccount = async () => {
         if (!editingAccount) return;
 
-        const updatedAccounts = accounts.filter(acc => acc.id !== editingAccount.id);
-        setAccounts(updatedAccounts);
-        await saveAccounts(updatedAccounts);
-        resetModalState();
+        try {
+            setLoading(true);
+            await accountAPI.delete(editingAccount._id);
+            setAccounts(accounts.filter(acc => acc._id !== editingAccount._id));
+            resetModalState();
+            Alert.alert('Success', 'Account deleted successfully');
+        } catch (error: unknown) {
+            if ((error as AxiosError)?.response?.status === 400) {
+                Alert.alert('Error', 'Cannot delete default account');
+            } else {
+                Alert.alert('Error', 'Failed to delete account');
+            }
+            console.error('Error deleting account:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const resetModalState = () => {
         setNewAccountName('');
         setSelectedIcon(accountIcons[0].icon);
         setInitialAmount('0');
+        setSelectedType('savings');
         setIsModalVisible(false);
         setIsEditModalVisible(false);
         setEditingAccount(null);
@@ -131,13 +145,21 @@ const AccountsScreen = () => {
         setEditingAccount(account);
         setNewAccountName(account.name);
         setSelectedIcon(account.icon);
-        setInitialAmount(account.balance.toString());
+        setSelectedType(account.type);
         setIsEditModalVisible(true);
     };
 
     const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
     const totalExpense = accounts.reduce((sum, account) => sum + (account.balance < 0 ? -account.balance : 0), 0);
     const totalIncome = accounts.reduce((sum, account) => sum + (account.balance > 0 ? account.balance : 0), 0);
+
+    if (loading && accounts.length === 0) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+        );
+    }
 
     const renderAccountModal = (isEdit: boolean) => (
         <Modal
@@ -159,6 +181,15 @@ const AccountsScreen = () => {
                             <Ionicons name="close" size={24} color={colors.text} />
                         </TouchableOpacity>
                     </View>
+
+                    {isEdit && editingAccount?.isDefault && (
+                        <View style={styles.defaultAccountMessage}>
+                            <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
+                            <Text style={styles.defaultAccountText}>
+                                This is a default account. You can edit its details but it cannot be deleted.
+                            </Text>
+                        </View>
+                    )}
 
                     {/* Initial Amount Input */}
                     <View style={styles.inputContainer}>
@@ -213,7 +244,7 @@ const AccountsScreen = () => {
 
                     {/* Action Buttons */}
                     <View style={styles.modalActions}>
-                        {isEdit && (
+                        {isEdit && !editingAccount?.isDefault && (
                             <TouchableOpacity
                                 style={[styles.modalButton, styles.deleteButton]}
                                 onPress={handleDeleteAccount}
@@ -271,7 +302,7 @@ const AccountsScreen = () => {
                     <View style={styles.accountsList}>
                         {accounts.map((account) => (
                             <TouchableOpacity
-                                key={account.id}
+                                key={account._id}
                                 onPress={() => handleAccountPress(account)}
                                 style={styles.accountCard}
                             >
@@ -288,6 +319,11 @@ const AccountsScreen = () => {
                                             {account.balance < 0 ? '-' : ''}₹{Math.abs(account.balance).toFixed(2)}
                                         </Text>
                                     </View>
+                                    {account.isDefault && (
+                                        <View style={styles.defaultBadge}>
+                                            <Text style={styles.defaultBadgeText}>Default</Text>
+                                        </View>
+                                    )}
                                 </View>
                             </TouchableOpacity>
                         ))}
@@ -387,6 +423,7 @@ const styles = StyleSheet.create({
     accountInfo: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
     },
     accountIconContainer: {
         width: 40,
@@ -532,6 +569,36 @@ const styles = StyleSheet.create({
         color: colors.background,
         fontSize: typography.sizes.base,
         fontWeight: typography.weights.medium,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: colors.background,
+    },
+    defaultBadge: {
+        backgroundColor: colors.primary + '15', // 15% opacity
+        paddingHorizontal: spacing.xs,
+        paddingVertical: 1,
+        borderRadius: borderRadius.sm,
+        borderWidth: 0.5,
+        borderColor: colors.primary,
+        marginLeft: spacing.sm,
+    },
+    defaultBadgeText: {
+        color: colors.primary,
+        fontSize: typography.sizes.xs,
+        fontWeight: typography.weights.medium,
+    },
+    defaultAccountMessage: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: spacing.lg,
+    },
+    defaultAccountText: {
+        color: colors.textSecondary,
+        fontSize: typography.sizes.base,
+        marginLeft: spacing.sm,
     },
 });
 

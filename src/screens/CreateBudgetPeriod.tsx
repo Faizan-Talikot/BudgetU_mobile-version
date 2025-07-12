@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -6,16 +6,54 @@ import {
     TouchableOpacity,
     Platform,
     Modal,
+    Alert,
+    ActivityIndicator,
+    ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { format, endOfMonth, startOfMonth, addMonths, isAfter, isBefore } from 'date-fns';
+import { format, endOfMonth, startOfMonth, addMonths, isAfter, isBefore, isWithinInterval, addDays, isSameMonth } from 'date-fns';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BudgetStackParamList } from '../navigation/BudgetStackNavigator';
 import { Calendar } from 'react-native-calendars';
 import { Button } from '../components/Button';
+import { budgetAPI } from '../services/api';
+import { transactionApi } from '../services/api';
+
+interface ExistingBudget {
+    name: string;
+    startDate: Date;
+    endDate: Date;
+}
+
+type MarkedDates = {
+    [date: string]: {
+        selected?: boolean;
+        marked?: boolean;
+        startingDay?: boolean;
+        color?: string;
+        dotColor?: string;
+    };
+};
+
+interface PaginatedTransactionResponse {
+    pagination: {
+        page: number;
+        pages: number;
+        total: number;
+    };
+    transactions: Array<{
+        _id: string;
+        amount: number;
+        isIncome: boolean;
+        description: string;
+        date: string;
+        category: string;
+        [key: string]: any;
+    }>;
+}
 
 const CreateBudgetPeriod: React.FC = () => {
     const navigation = useNavigation<NativeStackNavigationProp<BudgetStackParamList>>();
@@ -23,8 +61,48 @@ const CreateBudgetPeriod: React.FC = () => {
     const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(null);
     const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null);
     const [dateType, setDateType] = useState<'start' | 'end'>('start');
+    const [existingBudgets, setExistingBudgets] = useState<ExistingBudget[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
 
-    const handlePeriodSelect = (type: 'current' | 'next' | 'custom') => {
+    useEffect(() => {
+        loadExistingBudgets();
+    }, []);
+
+    const loadExistingBudgets = async () => {
+        try {
+            const budgets = await budgetAPI.getAll();
+            setExistingBudgets(budgets.map(budget => ({
+                name: budget.name,
+                startDate: new Date(budget.startDate),
+                endDate: new Date(budget.endDate)
+            })));
+        } catch (error) {
+            console.error('Error loading budgets:', error);
+            Alert.alert('Error', 'Failed to load existing budgets');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const checkDateOverlap = (start: Date, end: Date): ExistingBudget | null => {
+        return existingBudgets.find(budget => {
+            const budgetStart = new Date(budget.startDate);
+            const budgetEnd = new Date(budget.endDate);
+            
+            // Check if either the start or end date falls within an existing budget period
+            return (
+                isWithinInterval(start, { start: budgetStart, end: budgetEnd }) ||
+                isWithinInterval(end, { start: budgetStart, end: budgetEnd }) ||
+                isWithinInterval(budgetStart, { start, end }) ||
+                isWithinInterval(budgetEnd, { start, end })
+            );
+        }) || null;
+    };
+
+    const handlePeriodSelect = async (type: 'current' | 'next' | 'custom') => {
         const today = new Date();
         let startDate: Date;
         let endDate: Date;
@@ -33,12 +111,12 @@ const CreateBudgetPeriod: React.FC = () => {
             case 'current':
                 startDate = today;
                 endDate = endOfMonth(today);
-                navigateToAmount(startDate, endDate);
+                await validateAndNavigate(startDate, endDate);
                 break;
             case 'next':
                 startDate = startOfMonth(addMonths(today, 1));
                 endDate = endOfMonth(startDate);
-                navigateToAmount(startDate, endDate);
+                await validateAndNavigate(startDate, endDate);
                 break;
             case 'custom':
                 setShowCalendar(true);
@@ -51,44 +129,196 @@ const CreateBudgetPeriod: React.FC = () => {
         }
     };
 
-    const navigateToAmount = (startDate: Date, endDate: Date) => {
-        navigation.navigate('CreateBudgetAmount', {
-            startDate: format(startDate, 'yyyy-MM-dd'),
-            endDate: format(endDate, 'yyyy-MM-dd')
-        });
+    const validateAndNavigate = async (startDate: Date, endDate: Date) => {
+        const overlappingBudget = checkDateOverlap(startDate, endDate);
+        if (overlappingBudget) {
+            Alert.alert(
+                'Date Conflict',
+                `You already have a budget "${overlappingBudget.name}" for the period ${format(overlappingBudget.startDate, 'MMM d')} to ${format(overlappingBudget.endDate, 'MMM d')}. Please choose different dates.`
+            );
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            // Calculate existing income for the period
+            const formattedStartDate = format(startDate, 'yyyy-MM-dd');
+            const formattedEndDate = format(endDate, 'yyyy-MM-dd');
+            const existingIncome = await calculateExistingIncome(formattedStartDate, formattedEndDate);
+
+            // Navigate to next screen with existing income
+            navigation.navigate('CreateBudgetAmount', {
+                startDate: formattedStartDate,
+                endDate: formattedEndDate,
+                existingIncome
+            });
+        } catch (error) {
+            console.error('Error:', error);
+            Alert.alert('Error', 'Failed to process dates. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleDateSelect = (day: any) => {
+    const handleDateSelect = async (day: any) => {
         const selectedDate = new Date(day.timestamp);
         
         if (dateType === 'start') {
             setSelectedStartDate(selectedDate);
             setDateType('end');
         } else {
-            if (isBefore(selectedDate, selectedStartDate!)) {
+            let start = selectedStartDate!;
+            let end = selectedDate;
+            
+            if (isBefore(selectedDate, start)) {
                 // If end date is before start date, swap them
-                setSelectedEndDate(selectedStartDate);
-                setSelectedStartDate(selectedDate);
-            } else {
-                setSelectedEndDate(selectedDate);
+                end = start;
+                start = selectedDate;
             }
+            
+            setSelectedEndDate(end);
             setShowCalendar(false);
-            navigateToAmount(selectedStartDate!, selectedDate);
+            await validateAndNavigate(start, end);
         }
     };
 
-    const getMarkedDates = () => {
-        const markedDates: any = {};
-        const today = new Date();
-        const formattedToday = format(today, 'yyyy-MM-dd');
-        markedDates[formattedToday] = { disabled: false, startingDay: true, color: colors.primary };
+    const getMarkedDates = (): MarkedDates => {
+        const markedDates: MarkedDates = {};
+        
+        // Mark existing budget periods
+        existingBudgets.forEach(budget => {
+            let currentDate = new Date(budget.startDate);
+            const endDate = new Date(budget.endDate);
+            
+            while (currentDate <= endDate) {
+                const dateStr = format(currentDate, 'yyyy-MM-dd');
+                markedDates[dateStr] = {
+                    marked: true,
+                    dotColor: colors.error,
+                };
+                currentDate = addDays(currentDate, 1);
+            }
+        });
 
+        // Mark selected dates
         if (selectedStartDate) {
             const startStr = format(selectedStartDate, 'yyyy-MM-dd');
-            markedDates[startStr] = { selected: true, startingDay: true, color: colors.primary };
+            markedDates[startStr] = {
+                ...markedDates[startStr],
+                selected: true,
+                startingDay: true,
+                color: colors.primary
+            };
         }
 
         return markedDates;
+    };
+
+    const groupBudgetsByMonth = () => {
+        const grouped: { [key: string]: ExistingBudget[] } = {};
+        
+        existingBudgets.forEach(budget => {
+            const monthKey = format(new Date(budget.startDate), 'yyyy-MM');
+            if (!grouped[monthKey]) {
+                grouped[monthKey] = [];
+            }
+            grouped[monthKey].push(budget);
+        });
+
+        return Object.entries(grouped)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([month, budgets]) => ({
+                month,
+                title: format(new Date(month), 'MMMM yyyy'),
+                budgets: budgets.sort((a, b) => 
+                    new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+                )
+            }));
+    };
+
+    const renderListView = () => {
+        const groupedBudgets = groupBudgetsByMonth();
+        
+        return (
+            <ScrollView style={styles.listContainer}>
+                {groupedBudgets.map(({ month, title, budgets }) => (
+                    <View key={month} style={styles.monthSection}>
+                        <Text style={styles.monthTitle}>{title}</Text>
+                        {budgets.length > 0 ? (
+                            budgets.map((budget, index) => (
+                                <View key={index} style={styles.budgetItem}>
+                                    <View style={styles.budgetItemDot} />
+                                    <View style={styles.budgetItemContent}>
+                                        <Text style={styles.budgetItemTitle}>
+                                            {budget.name}
+                                        </Text>
+                                        <Text style={styles.budgetItemDates}>
+                                            {format(new Date(budget.startDate), 'MMM d')} - {format(new Date(budget.endDate), 'MMM d')}
+                                        </Text>
+                                    </View>
+                                </View>
+                            ))
+                        ) : (
+                            <Text style={styles.noBudgetsText}>No budgets for this month</Text>
+                        )}
+                    </View>
+                ))}
+            </ScrollView>
+        );
+    };
+
+    // Calculate existing income for the selected period
+    const calculateExistingIncome = async (start: string, end: string) => {
+        try {
+            setIsLoading(true);
+            console.log('Fetching transactions for period:', { start, end });
+            
+            // Get transactions for the period
+            const response = await transactionApi.getByDateRange(start, end);
+            console.log('Got transactions:', response);
+            
+            // Extract transactions array from paginated response
+            const transactions = response.transactions || [];
+            
+            // Filter and sum up income transactions
+            const totalIncome = transactions
+                .filter(t => t.isIncome)
+                .reduce((sum, t) => sum + t.amount, 0);
+            
+            console.log('Calculated total income:', totalIncome);
+            return totalIncome;
+            
+        } catch (error) {
+            console.error('Error calculating existing income:', error);
+            return 0;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleContinue = async () => {
+        if (!startDate || !endDate) {
+            Alert.alert('Error', 'Please select both start and end dates');
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            // Calculate existing income for the period
+            const existingIncome = await calculateExistingIncome(startDate, endDate);
+
+            // Navigate to next screen with existing income
+            navigation.navigate('CreateBudgetAmount', {
+                startDate,
+                endDate,
+                existingIncome
+            });
+        } catch (error) {
+            console.error('Error:', error);
+            Alert.alert('Error', 'Failed to process dates. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -166,8 +396,36 @@ const CreateBudgetPeriod: React.FC = () => {
                     <View style={styles.calendarContainer}>
                         <View style={styles.calendarHeader}>
                             <Text style={styles.calendarTitle}>
-                                Select {dateType === 'start' ? 'Start' : 'End'} Date
+                                {isLoading ? 'Loading Budgets...' : `Select ${dateType === 'start' ? 'Start' : 'End'} Date`}
                             </Text>
+                            <View style={styles.viewToggle}>
+                                <TouchableOpacity 
+                                    style={[
+                                        styles.viewToggleButton,
+                                        viewMode === 'calendar' && styles.viewToggleButtonActive
+                                    ]}
+                                    onPress={() => setViewMode('calendar')}
+                                >
+                                    <Ionicons 
+                                        name="calendar" 
+                                        size={20} 
+                                        color={viewMode === 'calendar' ? colors.primary : colors.textSecondary} 
+                                    />
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={[
+                                        styles.viewToggleButton,
+                                        viewMode === 'list' && styles.viewToggleButtonActive
+                                    ]}
+                                    onPress={() => setViewMode('list')}
+                                >
+                                    <Ionicons 
+                                        name="list" 
+                                        size={20} 
+                                        color={viewMode === 'list' ? colors.primary : colors.textSecondary} 
+                                    />
+                                </TouchableOpacity>
+                            </View>
                             <TouchableOpacity 
                                 onPress={() => setShowCalendar(false)}
                                 style={styles.closeButton}
@@ -176,27 +434,50 @@ const CreateBudgetPeriod: React.FC = () => {
                             </TouchableOpacity>
                         </View>
                         
-                        <Calendar
-                            minDate={format(new Date(), 'yyyy-MM-dd')}
-                            onDayPress={handleDateSelect}
-                            markedDates={getMarkedDates()}
-                            theme={{
-                                selectedDayBackgroundColor: colors.primary,
-                                todayTextColor: colors.primary,
-                                arrowColor: colors.primary,
-                                monthTextColor: colors.text,
-                                textDayFontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-                                textMonthFontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-                                textDayHeaderFontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-                            }}
-                        />
-
-                        {selectedStartDate && dateType === 'end' && (
-                            <View style={styles.dateInfo}>
-                                <Text style={styles.dateInfoText}>
-                                    Start Date: {format(selectedStartDate, 'MMM d, yyyy')}
-                                </Text>
+                        {isLoading ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator size="large" color={colors.primary} />
+                                <Text style={styles.loadingText}>Loading existing budgets...</Text>
                             </View>
+                        ) : viewMode === 'calendar' ? (
+                            <>
+                                <Calendar
+                                    minDate={format(new Date(), 'yyyy-MM-dd')}
+                                    onDayPress={handleDateSelect}
+                                    markedDates={getMarkedDates()}
+                                    theme={{
+                                        selectedDayBackgroundColor: colors.primary,
+                                        todayTextColor: colors.primary,
+                                        arrowColor: colors.primary,
+                                        monthTextColor: colors.text,
+                                        textDayFontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+                                        textMonthFontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+                                        textDayHeaderFontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+                                    }}
+                                />
+
+                                {selectedStartDate && (
+                                    <View style={styles.dateInfo}>
+                                        <Text style={styles.dateInfoText}>
+                                            Selected: {format(selectedStartDate, 'MMM d, yyyy')}
+                                            {dateType === 'end' ? ' (Now select end date)' : ''}
+                                        </Text>
+                                    </View>
+                                )}
+
+                                <View style={styles.legend}>
+                                    <View style={styles.legendItem}>
+                                        <View style={[styles.legendDot, { backgroundColor: colors.error }]} />
+                                        <Text style={styles.legendText}>Existing Budget Period</Text>
+                                    </View>
+                                    <View style={styles.legendItem}>
+                                        <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
+                                        <Text style={styles.legendText}>Selected Period</Text>
+                                    </View>
+                                </View>
+                            </>
+                        ) : (
+                            renderListView()
                         )}
                     </View>
                 </View>
@@ -301,6 +582,98 @@ const styles = StyleSheet.create({
         fontSize: typography.sizes.sm,
         color: colors.text,
         textAlign: 'center',
+    },
+    loadingContainer: {
+        padding: spacing.xl,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        marginTop: spacing.md,
+        fontSize: typography.sizes.base,
+        color: colors.textSecondary,
+    },
+    legend: {
+        marginTop: spacing.md,
+        padding: spacing.md,
+        backgroundColor: colors.secondary,
+        borderRadius: borderRadius.md,
+    },
+    legendItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: spacing.xs,
+    },
+    legendDot: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        marginRight: spacing.sm,
+    },
+    legendText: {
+        fontSize: typography.sizes.sm,
+        color: colors.textSecondary,
+    },
+    viewToggle: {
+        flexDirection: 'row',
+        backgroundColor: colors.secondary,
+        borderRadius: borderRadius.full,
+        padding: 2,
+        marginHorizontal: spacing.md,
+    },
+    viewToggleButton: {
+        padding: spacing.sm,
+        borderRadius: borderRadius.full,
+    },
+    viewToggleButtonActive: {
+        backgroundColor: colors.background,
+    },
+    listContainer: {
+        maxHeight: 400,
+    },
+    monthSection: {
+        marginBottom: spacing.lg,
+    },
+    monthTitle: {
+        fontSize: typography.sizes.lg,
+        fontWeight: typography.weights.bold,
+        color: colors.text,
+        marginBottom: spacing.sm,
+    },
+    budgetItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.md,
+        backgroundColor: colors.secondary,
+        borderRadius: borderRadius.md,
+        marginBottom: spacing.xs,
+    },
+    budgetItemDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: colors.error,
+        marginRight: spacing.sm,
+    },
+    budgetItemContent: {
+        flex: 1,
+    },
+    budgetItemTitle: {
+        fontSize: typography.sizes.base,
+        fontWeight: typography.weights.medium,
+        color: colors.text,
+    },
+    budgetItemDates: {
+        fontSize: typography.sizes.sm,
+        color: colors.textSecondary,
+        marginTop: 2,
+    },
+    noBudgetsText: {
+        fontSize: typography.sizes.sm,
+        color: colors.textSecondary,
+        fontStyle: 'italic',
+        paddingVertical: spacing.sm,
     },
 });
 

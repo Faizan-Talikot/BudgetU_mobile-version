@@ -1,4 +1,5 @@
 import { apiConfig } from './config';
+import { storage } from '../utils/storage';
 
 // API base URL
 const API_URL = apiConfig.API_URL;
@@ -68,7 +69,7 @@ export const authApi = {
     },
 
     getProfile: async () => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -84,7 +85,7 @@ export const authApi = {
     },
 
     changePassword: async (currentPassword: string, newPassword: string) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -107,7 +108,7 @@ export const authApi = {
 export const budgetApi = {
     // Get all budgets
     getBudgets: async () => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -124,7 +125,7 @@ export const budgetApi = {
 
     // Get active budgets
     getActiveBudgets: async () => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -141,7 +142,7 @@ export const budgetApi = {
 
     // Get budget by ID
     getBudgetById: async (id: string) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -158,7 +159,7 @@ export const budgetApi = {
 
     // Get budget summary
     getBudgetSummary: async (id: string) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -189,7 +190,7 @@ export const budgetApi = {
         isRecurring?: boolean;
         recurringPeriod?: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
     }) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -224,7 +225,7 @@ export const budgetApi = {
         isRecurring?: boolean;
         recurringPeriod?: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
     }) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -244,7 +245,7 @@ export const budgetApi = {
 
     // Delete a budget
     deleteBudget: async (id: string) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -268,7 +269,7 @@ export const budgetApi = {
         icon?: string;
         isEssential?: boolean;
     }) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -295,7 +296,7 @@ export const budgetApi = {
         icon?: string;
         isEssential?: boolean;
     }) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -315,7 +316,7 @@ export const budgetApi = {
 
     // Delete a budget category
     deleteBudgetCategory: async (budgetId: string, categoryId: string) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -333,7 +334,7 @@ export const budgetApi = {
 
     // Create next recurring budget
     createRecurringBudget: async (id: string) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -354,7 +355,7 @@ export const budgetApi = {
 export const transactionApi = {
     // Get all transactions with filtering
     getTransactions: async (filters = {}) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -379,7 +380,7 @@ export const transactionApi = {
 
     // Get transaction by ID
     getTransactionById: async (id: string) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -407,7 +408,7 @@ export const transactionApi = {
         receiptImage?: string;
         notes?: string;
     }) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -438,7 +439,7 @@ export const transactionApi = {
         receiptImage?: string;
         notes?: string;
     }) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -458,7 +459,7 @@ export const transactionApi = {
 
     // Delete a transaction
     deleteTransaction: async (id: string) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -476,7 +477,7 @@ export const transactionApi = {
 
     // Get spending summary by category
     getSpendingSummary: async (startDate?: string, endDate?: string) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -502,7 +503,7 @@ export const transactionApi = {
 
     // Upload receipt image
     uploadReceiptImage: async (file: File) => {
-        const token = localStorage.getItem("budgetu-token");
+        const token = await storage.get('token');
 
         if (!token) {
             throw new Error("No authentication token found");
@@ -524,20 +525,20 @@ export const transactionApi = {
 };
 
 // Helper to check if user is authenticated
-export const isAuthenticated = () => {
-    return !!localStorage.getItem("budgetu-token");
+export const isAuthenticated = async () => {
+    const token = await storage.get<string>('token');
+    return !!token;
 };
 
-// Helper to get user data from localStorage
-export const getUserData = () => {
-    const userJson = localStorage.getItem("budgetu-user");
-    return userJson ? JSON.parse(userJson) : null;
+// Helper to get user data
+export const getUserData = async () => {
+    return await storage.get('user');
 };
 
 // Helper to logout user
-export const logout = () => {
-    localStorage.removeItem("budgetu-token");
-    localStorage.removeItem("budgetu-user");
+export const logout = async () => {
+    await storage.remove('token');
+    await storage.remove('user');
 };
 
 export default {

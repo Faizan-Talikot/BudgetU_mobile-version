@@ -21,13 +21,16 @@ interface UserData {
 
 class ApiClient {
     private async getHeaders(): Promise<Headers> {
-        const userData = await storage.get<UserData>(StorageKeys.USER_DATA);
+        const authData = await storage.get<{user: any; token: string}>(StorageKeys.USER_DATA);
         const headers = new Headers({
             'Content-Type': 'application/json',
         });
 
-        if (userData?.token) {
-            headers.append('Authorization', `Bearer ${userData.token}`);
+        if (authData?.token) {
+            console.log('Current token:', authData.token);
+            headers.append('Authorization', `Bearer ${authData.token}`);
+        } else {
+            console.log('No token found in storage');
         }
 
         return headers;
@@ -68,7 +71,7 @@ class ApiClient {
                     await storage.set(StorageKeys.USER_DATA, {
                         ...userData,
                         token: newTokens.token,
-                        refreshToken: newTokens.refreshToken,
+                        refreshToken: newTokens.refreshToken || newTokens.token,
                     });
                     return;
                 }

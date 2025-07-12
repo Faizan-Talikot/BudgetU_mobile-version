@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     ScrollView,
@@ -12,192 +12,147 @@ import {
     ViewStyle,
     KeyboardAvoidingView,
     Platform,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { colors, typography, spacing, borderRadius, shadows } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
-import { format, addDays, startOfMonth, endOfMonth, differenceInDays, isValid, isBefore, isAfter, isSameDay } from 'date-fns';
+import { format, addDays, startOfMonth, endOfMonth, differenceInDays, isValid, isBefore, isAfter, isSameDay, addMonths, subMonths } from 'date-fns';
 import { Calendar } from 'react-native-calendars';
 import { MarkedDates } from 'react-native-calendars/src/types';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
+import { budgetAPI, categoryAPI, type Budget } from '../services/api';
+import type { Category } from '../types/category';
 
 const { width } = Dimensions.get('window');
 
-// Define types for our data structures
-interface Category {
-    name: string;
-    allocated: number;
-    spent: number;
-    color: string;
+// Interface for budget categories as they come from the API
+interface BudgetCategory {
+    category: string;  // Category ID
+    allocatedAmount: number;
+    spentAmount: number;
 }
 
-interface Budget {
+// Interface for the processed category details we use in the UI
+interface CategoryDetails {
     id: string;
     name: string;
-    startDate: string;
-    endDate: string;
-    totalAmount: number;
-    spentAmount: number;
-    categories: Category[];
+    color: string;
+    type: 'income' | 'expense';
+    icon: string;
+    isDefault: boolean;
 }
 
-// Sample data - replace with real data later
-const sampleBudget: Budget = {
-    id: '1',
-    name: 'May Budget',
-    startDate: '2024-05-01',
-    endDate: '2024-05-31',
-    totalAmount: 15000,
-    spentAmount: 3750,
-    categories: [
-        { name: 'Food & Dining', allocated: 5000, spent: 2000, color: '#FF6B6B' },
-        { name: 'Transportation', allocated: 2000, spent: 800, color: '#4ECDC4' },
-        { name: 'Entertainment', allocated: 1500, spent: 500, color: '#45B7D1' },
-        { name: 'Education', allocated: 4000, spent: 450, color: '#96CEB4' },
-    ]
-};
+interface ProcessedBudget extends Omit<Budget, 'categories'> {
+    categories: {
+        category: CategoryDetails;
+        allocatedAmount: number;
+        spentAmount: number;
+    }[];
+}
 
 const BudgetsScreen: React.FC = () => {
     const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-    const [isModalVisible, setIsModalVisible] = useState(false);
     const [activeTab, setActiveTab] = useState('active');
-    const [currentStep, setCurrentStep] = useState(1);
-    const [budgetName, setBudgetName] = useState('');
-    const [totalAmount, setTotalAmount] = useState('');
-    const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(null);
-    const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null);
-    const [showStartCalendar, setShowStartCalendar] = useState(false);
-    const [showEndCalendar, setShowEndCalendar] = useState(false);
-    const [dateError, setDateError] = useState('');
-    const [calendarVisible, setCalendarVisible] = useState(false);
-    const [dateType, setDateType] = useState<'start' | 'end'>('start');
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [loading, setLoading] = useState(true);
+    const [budgets, setBudgets] = useState<Budget[]>([]);
+    const [categories, setCategories] = useState<Record<string, CategoryDetails>>({});
+    const [hasAnyBudgets, setHasAnyBudgets] = useState(true);
     
     // Animation value for progress bar
     const progressAnim = React.useRef(new Animated.Value(0)).current;
 
-    React.useEffect(() => {
-        // Animate progress bar when component mounts
-        Animated.timing(progressAnim, {
-            toValue: sampleBudget.spentAmount / sampleBudget.totalAmount,
-            duration: 1000,
-            useNativeDriver: false,
-        }).start();
+    // Load budgets when component mounts or activeTab changes
+    useEffect(() => {
+        loadData();
     }, []);
 
-    // Function to format date for calendar marking
-    const getMarkedDates = (): MarkedDates => {
-        const markedDates: MarkedDates = {};
-        
-        if (!selectedStartDate) return markedDates;
+    useEffect(() => {
+        loadData();
+    }, [currentDate, activeTab]);
 
-        const startDateStr = format(selectedStartDate, 'yyyy-MM-dd');
-        markedDates[startDateStr] = {
-            selected: true,
-            startingDay: true,
-            color: colors.primary,
-        };
-        
-        if (selectedEndDate) {
-            const endDateStr = format(selectedEndDate, 'yyyy-MM-dd');
-            markedDates[endDateStr] = {
-                selected: true,
-                endingDay: true,
-                color: colors.primary,
-            };
+    // Reset to current month when navigating back to this screen
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            setCurrentDate(new Date());
+            loadData(); // Refresh data when screen is focused
+        });
 
-            // Mark dates in between
-            let currentDate = addDays(selectedStartDate, 1);
-            while (isBefore(currentDate, selectedEndDate)) {
-                const dateStr = format(currentDate, 'yyyy-MM-dd');
-                markedDates[dateStr] = {
-                    selected: true,
-                    color: colors.primary,
-                };
-                currentDate = addDays(currentDate, 1);
-            }
+        return unsubscribe;
+    }, [navigation]);
+
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            const [budgetsData, categoriesData] = await Promise.all([
+                budgetAPI.getAll(),
+                categoryAPI.getAll()
+            ]);
+
+            // Set hasAnyBudgets based on whether there are any budgets at all
+            setHasAnyBudgets(budgetsData.length > 0);
+
+            // Create a map of category details by ID
+            const categoryMap = categoriesData.reduce((acc: Record<string, CategoryDetails>, cat: any) => {
+                const id = cat._id || cat.id;
+                if (id) {
+                    // Check if name is actually an ID (starts with a number and is long)
+                    const isNameAnId = /^\d/.test(cat.name) && cat.name.length > 20;
+                    
+                    // Handle icon - ensure it's a valid Ionicons name
+                    let icon = cat.icon;
+                    if (icon === 'default-icon' || !icon) {
+                        icon = 'help-circle-outline';
+                    } else if (!icon.endsWith('-outline')) {
+                        icon = `${icon}-outline`;
+                    }
+
+                    acc[id] = {
+                        id,
+                        name: isNameAnId ? 'Unnamed Category' : (cat.name || 'Unknown Category'),
+                        color: cat.color || colors.primary,
+                        type: cat.type || 'expense',
+                        icon,
+                        isDefault: cat.isDefault || false
+                    };
+                }
+                return acc;
+            }, {});
+
+            // Filter budgets by month and active/past status
+            const filteredBudgets = budgetsData.filter(budget => {
+                const budgetStartDate = new Date(budget.startDate);
+                const budgetEndDate = new Date(budget.endDate);
+                const currentMonthStart = startOfMonth(currentDate);
+                const currentMonthEnd = endOfMonth(currentDate);
+
+                // Check if budget overlaps with current month
+                const isInCurrentMonth = (
+                    (budgetStartDate <= currentMonthEnd && budgetEndDate >= currentMonthStart)
+                );
+
+                // Check active/past status
+                const isActive = budget.status === 'active';
+                return isInCurrentMonth && (
+                    (activeTab === 'active' && isActive) ||
+                    (activeTab === 'past' && !isActive)
+                );
+            });
+
+            setCategories(categoryMap);
+            setBudgets(filteredBudgets);
+        } catch (error) {
+            console.error('Error loading data:', error);
+            Alert.alert('Error', 'Failed to load budgets and categories');
+        } finally {
+            setLoading(false);
         }
-
-        return markedDates;
-    };
-
-    // Format date safely
-    const formatDate = (date: Date | null, formatStr: string): string => {
-        if (!date) return '';
-        return format(date, formatStr);
-    };
-
-    // Validate dates and update error state
-    const validateDates = (start: Date | null, end: Date | null): boolean => {
-        if (!start || !end) {
-            setDateError('Please select both start and end dates');
-            return false;
-        }
-
-        if (isBefore(start, startOfMonth(new Date()))) {
-            setDateError('Start date cannot be in the past');
-            return false;
-        }
-
-        if (isBefore(end, start)) {
-            setDateError('End date must be after or same as start date');
-            return false;
-        }
-
-        setDateError('');
-        return true;
-    };
-
-    // Check if form is valid for next step
-    const isFormValid = (): boolean => {
-        return Boolean(
-            budgetName.trim() !== '' &&
-            parseFloat(totalAmount) > 0 &&
-            selectedStartDate &&
-            selectedEndDate &&
-            !dateError
-        );
-    };
-
-    const handleDateSelection = (type: 'current' | 'next' | 'custom') => {
-        if (type === 'current') {
-            const now = new Date();
-            const monthEnd = endOfMonth(now);
-            setSelectedStartDate(now);
-            setSelectedEndDate(monthEnd);
-        } else if (type === 'next') {
-            const today = new Date();
-            const firstDayNextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-            const lastDayNextMonth = endOfMonth(firstDayNextMonth);
-            setSelectedStartDate(firstDayNextMonth);
-            setSelectedEndDate(lastDayNextMonth);
-        } else {
-            setSelectedStartDate(null);
-            setSelectedEndDate(null);
-            handleShowCalendar('start');
-        }
-    };
-
-    const handleShowCalendar = (type: 'start' | 'end') => {
-        setDateType(type);
-        setCalendarVisible(true);
-    };
-
-    const handleDateSelect = (day: any) => {
-        const selectedDate = new Date(day.timestamp);
-        if (dateType === 'start') {
-            setSelectedStartDate(selectedDate);
-            // If end date exists and is before new start date, clear it
-            if (selectedEndDate && isBefore(selectedEndDate, selectedDate)) {
-                setSelectedEndDate(null);
-            }
-        } else {
-            setSelectedEndDate(selectedDate);
-        }
-        setCalendarVisible(false);
     };
 
     const handleCreateBudget = () => {
@@ -207,14 +162,54 @@ const BudgetsScreen: React.FC = () => {
         });
     };
 
+    const handleDeleteBudget = async (budgetId: string) => {
+        Alert.alert(
+            'Confirm Delete',
+            'Are you sure you want to delete this budget?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            await budgetAPI.delete(budgetId);
+                            setBudgets(prev => prev.filter(b => b._id !== budgetId));
+                            Alert.alert('Success', 'Budget deleted successfully');
+                        } catch (error) {
+                            console.error('Error deleting budget:', error);
+                            Alert.alert('Error', 'Failed to delete budget');
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handlePreviousMonth = () => {
+        setCurrentDate(prevDate => subMonths(prevDate, 1));
+    };
+
+    const handleNextMonth = () => {
+        setCurrentDate(prevDate => addMonths(prevDate, 1));
+    };
+
     const renderBudgetCard = (budget: Budget) => {
-        const spentPercentage = (budget.spentAmount / budget.totalAmount) * 100;
-        const remainingAmount = budget.totalAmount - budget.spentAmount;
+        // Calculate progress and other metrics
+        const totalAllocated = budget.categories.reduce((sum, cat) => sum + (cat.allocatedAmount || 0), 0);
+        const availableToBudget = budget.totalIncome - totalAllocated;
+        const remainingAmount = totalAllocated - budget.totalSpent;
         const daysLeft = differenceInDays(new Date(budget.endDate), new Date());
-        const dailyBudget = remainingAmount / (daysLeft || 1);
+        const spentPercentage = (budget.totalSpent / totalAllocated) * 100;
+        const isOverBudget = remainingAmount < 0;
+        const overBudgetAmount = Math.abs(remainingAmount);
+        const dailyBudget = isOverBudget ? 0 : (remainingAmount / (daysLeft || 1));
 
         return (
-            <Card style={styles.budgetCard}>
+            <Card key={budget._id} style={styles.budgetCard}>
                 {/* Budget Header */}
                 <View style={styles.budgetHeader}>
                     <View>
@@ -223,272 +218,180 @@ const BudgetsScreen: React.FC = () => {
                             {format(new Date(budget.startDate), 'MMM d')} - {format(new Date(budget.endDate), 'MMM d, yyyy')}
                         </Text>
                     </View>
-                    <TouchableOpacity style={styles.moreButton}>
-                        <Ionicons name="ellipsis-horizontal" size={24} color={colors.text} />
+                    <TouchableOpacity 
+                        onPress={() => handleDeleteBudget(budget._id!)}
+                        style={styles.deleteButton}
+                    >
+                        <Ionicons name="trash-outline" size={24} color={colors.error} />
                     </TouchableOpacity>
                 </View>
 
                 {/* Budget Overview */}
-                <View style={styles.overview}>
-                    <View style={styles.overviewItem}>
-                        <Text style={styles.overviewLabel}>Total Budget</Text>
-                        <Text style={styles.overviewAmount}>₹{budget.totalAmount.toLocaleString()}</Text>
+                <View style={styles.budgetInfo}>
+                    <View style={styles.budgetRow}>
+                        <Text style={styles.budgetLabel}>Total Income</Text>
+                        <Text style={styles.budgetAmount}>₹{budget.totalIncome || 0}</Text>
                     </View>
-                    <View style={styles.overviewDivider} />
-                    <View style={styles.overviewItem}>
-                        <Text style={styles.overviewLabel}>Remaining</Text>
-                        <Text style={[styles.overviewAmount, { color: colors.success }]}>
-                            ₹{remainingAmount.toLocaleString()}
+                    <View style={styles.budgetRow}>
+                        <Text style={styles.budgetLabel}>Available to Budget</Text>
+                        <Text style={[
+                            styles.budgetAmount,
+                            availableToBudget < 0 ? styles.negativeAmount : styles.positiveAmount
+                        ]}>
+                            ₹{availableToBudget || 0}
+                        </Text>
+                    </View>
+                    {availableToBudget > 0 && (
+                        <Text style={styles.availableMessage}>
+                            You have ₹{availableToBudget} unallocated. Consider adding to savings or increasing categories.
+                        </Text>
+                    )}
+                    {availableToBudget < 0 && (
+                        <Text style={[styles.availableMessage, styles.warningMessage]}>
+                            ⚠️ Warning: You've budgeted ₹{Math.abs(availableToBudget)} more than your income.
+                        </Text>
+                    )}
+                    <View style={styles.budgetRow}>
+                        <Text style={styles.budgetLabel}>Total Budgeted</Text>
+                        <Text style={styles.budgetAmount}>₹{totalAllocated}</Text>
+                    </View>
+                    <View style={styles.budgetRow}>
+                        <Text style={styles.budgetLabel}>Remaining</Text>
+                        <Text style={[
+                            styles.budgetAmount,
+                            remainingAmount < 0 ? styles.negativeAmount : styles.positiveAmount
+                        ]}>
+                            ₹{remainingAmount}
                         </Text>
                     </View>
                 </View>
 
-                {/* Progress Bar */}
-                <View style={styles.progressContainer}>
-                    <View style={styles.progressHeader}>
-                        <Text style={styles.progressLabel}>
-                            Spent: ₹{budget.spentAmount.toLocaleString()} ({spentPercentage.toFixed(1)}%)
-                        </Text>
-                        <Text style={styles.daysLeft}>{daysLeft} days left</Text>
-                    </View>
-                    <View style={styles.progressBar}>
-                        <Animated.View 
-                            style={[
-                                styles.progressFill,
-                                {
-                                    width: progressAnim.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: ['0%', '100%']
-                                    }),
-                                    backgroundColor: spentPercentage > 90 ? colors.error : 
-                                                   spentPercentage > 75 ? colors.warning : 
-                                                   colors.success
-                                }
-                            ]} 
-                        />
-                    </View>
-                </View>
+                {/* Spent Amount */}
+                <Text style={styles.spentText}>
+                    Spent: ₹{budget.totalSpent} ({spentPercentage.toFixed(1)}%)
+                </Text>
+
+                {/* Days Left */}
+                <Text style={styles.daysLeft}>{daysLeft} days left</Text>
 
                 {/* Daily Budget */}
-                <View style={styles.dailyBudgetContainer}>
+                <View style={[
+                    styles.dailyBudgetContainer,
+                    isOverBudget && styles.overBudgetContainer
+                ]}>
+                    <Ionicons 
+                        name={isOverBudget ? "warning-outline" : "calendar-outline"} 
+                        size={24} 
+                        color={isOverBudget ? colors.error : colors.primary} 
+                    />
                     <View style={styles.dailyBudgetContent}>
-                        <Ionicons name="calendar-outline" size={24} color={colors.primary} />
-                        <View style={styles.dailyBudgetText}>
-                            <Text style={styles.dailyBudgetLabel}>Daily Budget</Text>
-                            <Text style={styles.dailyBudgetAmount}>₹{dailyBudget.toFixed(0)}/day</Text>
-                        </View>
+                        {isOverBudget ? (
+                            <>
+                                <Text style={[styles.dailyBudgetLabel, styles.overBudgetLabel]}>
+                                    Over Budget
+                                </Text>
+                                <Text style={[styles.dailyBudgetAmount, styles.overBudgetAmount]}>
+                                    ₹{overBudgetAmount.toFixed(0)} total overspent
+                                </Text>
+                            </>
+                        ) : (
+                            <>
+                                <Text style={styles.dailyBudgetLabel}>Daily Budget</Text>
+                                <Text style={styles.dailyBudgetAmount}>₹{dailyBudget.toFixed(0)}/day</Text>
+                            </>
+                        )}
                     </View>
                 </View>
 
-                {/* Categories */}
+                {/* Category Breakdown */}
                 <View style={styles.categorySection}>
                     <Text style={styles.sectionTitle}>Category Breakdown</Text>
-                    {budget.categories.map((category: Category, index: number) => (
-                        <View key={index} style={styles.categoryItem}>
-                            <View style={styles.categoryHeader}>
-                                <View style={styles.categoryTitleSection}>
-                                    <View style={[styles.categoryDot, { backgroundColor: category.color }]} />
-                                    <Text style={styles.categoryName}>{category.name}</Text>
-                                </View>
-                                <Text style={styles.categoryAmount}>
-                                    ₹{category.spent.toLocaleString()} / ₹{category.allocated.toLocaleString()}
-                                </Text>
-                            </View>
-                            <View style={styles.categoryProgress}>
-                                <View 
-                                    style={[
-                                        styles.categoryProgressFill,
-                                        {
-                                            width: `${(category.spent / category.allocated) * 100}%`,
-                                            backgroundColor: category.color
+                    {budget.categories && budget.categories.length > 0 ? (
+                        budget.categories
+                            .map((cat, index) => {
+                                // Extract category ID from the category field
+                                let categoryId = '';
+                                let categoryDetails;
+
+                                if (typeof cat.category === 'string') {
+                                    categoryId = cat.category;
+                                    categoryDetails = categories[categoryId];
+                                } else if (typeof cat.category === 'object' && cat.category !== null) {
+                                    // Try to get ID from either id or _id field
+                                    categoryId = (cat.category as any).id || (cat.category as any)._id || '';
+                                    
+                                    // If we have the full category object, use it directly
+                                    if (categoryId) {
+                                        categoryDetails = {
+                                            id: categoryId,
+                                            name: (cat.category as any).name || 'Unknown Category',
+                                            color: (cat.category as any).color || colors.primary,
+                                            type: (cat.category as any).type || 'expense',
+                                            icon: (cat.category as any).icon === 'default-icon' ? 'wallet-outline' : ((cat.category as any).icon || 'wallet-outline'),
+                                            isDefault: (cat.category as any).isDefault || false
+                                        };
+                                        
+                                        // Add to our categories map if not already there
+                                        if (!(categoryId in categories)) {
+                                            categories[categoryId] = categoryDetails;
                                         }
-                                    ]} 
-                                />
-                            </View>
-                        </View>
-                    ))}
+                                    }
+                                }
+
+                                // Return null for unknown categories to filter them out
+                                if (!categoryDetails) {
+                                    return null;
+                                }
+
+                                // Ensure icon is valid
+                                const iconName = categoryDetails.icon === 'default-icon' || !categoryDetails.icon
+                                    ? 'wallet-outline'
+                                    : categoryDetails.icon.endsWith('-outline') 
+                                        ? categoryDetails.icon 
+                                        : `${categoryDetails.icon}-outline`;
+
+                                return (
+                                    <View key={categoryDetails.id} style={styles.categoryRow}>
+                                        <View style={styles.categoryNameContainer}>
+                                            <Ionicons 
+                                                name={iconName as any} 
+                                                size={20} 
+                                                color={categoryDetails.color || colors.primary} 
+                                            />
+                                            <Text style={styles.categoryName}>{categoryDetails.name}</Text>
+                                        </View>
+                                        <Text style={styles.categoryAmount}>
+                                            ₹{cat.spentAmount} / ₹{cat.allocatedAmount}
+                                        </Text>
+                                    </View>
+                                );
+                            })
+                            .filter(Boolean) // Remove null entries (unknown categories)
+                    ) : (
+                        <Text style={styles.emptyText}>No categories added</Text>
+                    )}
                 </View>
             </Card>
         );
     };
 
-    const renderModalContent = () => {
-        switch (currentStep) {
-            case 1:
-                return (
-                    <ScrollView 
-                        keyboardShouldPersistTaps="handled"
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.modalContentContainer}
-                    >
-                        <Text style={styles.modalTitle}>Create New Budget</Text>
-                        <Text style={styles.modalSubtitle}>
-                            Set up your budget details. You'll be able to add categories in the next step.
-                        </Text>
-
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Budget Name</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="e.g. November 2023"
-                                placeholderTextColor={colors.textSecondary}
-                                value={budgetName}
-                                onChangeText={setBudgetName}
-                            />
-                        </View>
-
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Total Budget Amount (₹)</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="e.g. 12000"
-                                keyboardType="numeric"
-                                placeholderTextColor={colors.textSecondary}
-                                value={totalAmount}
-                                onChangeText={setTotalAmount}
-                            />
-                        </View>
-
-                        <View style={styles.dateContainer}>
-                            <Text style={styles.label}>Budget Duration</Text>
-                            <TouchableOpacity 
-                                style={[
-                                    styles.dateOption,
-                                    !selectedStartDate && !selectedEndDate && styles.selectedDateOption
-                                ]}
-                                onPress={() => handleDateSelection('current')}
-                            >
-                                <Ionicons 
-                                    name="calendar-outline" 
-                                    size={24} 
-                                    color={!selectedStartDate && !selectedEndDate ? colors.background : colors.primary} 
-                                />
-                                <View style={styles.dateOptionText}>
-                                    <Text style={[
-                                        styles.dateOptionTitle,
-                                        !selectedStartDate && !selectedEndDate && styles.selectedDateText
-                                    ]}>Rest of Current Month</Text>
-                                    <Text style={[
-                                        styles.dateOptionSubtitle,
-                                        !selectedStartDate && !selectedEndDate && styles.selectedDateText
-                                    ]}>
-                                        {format(new Date(), 'MMM d')} - {format(endOfMonth(new Date()), 'MMM d')}
-                                    </Text>
-                                </View>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity 
-                                style={[
-                                    styles.dateOption,
-                                    selectedStartDate && selectedEndDate && 
-                                    isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) && 
-                                    styles.selectedDateOption
-                                ]}
-                                onPress={() => handleDateSelection('next')}
-                            >
-                                <Ionicons 
-                                    name="calendar-outline" 
-                                    size={24} 
-                                    color={selectedStartDate && selectedEndDate && 
-                                          isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) ? 
-                                          colors.background : colors.primary} 
-                                />
-                                <View style={styles.dateOptionText}>
-                                    <Text style={[
-                                        styles.dateOptionTitle,
-                                        selectedStartDate && selectedEndDate && 
-                                        isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) && 
-                                        styles.selectedDateText
-                                    ]}>Next Month</Text>
-                                    <Text style={[
-                                        styles.dateOptionSubtitle,
-                                        selectedStartDate && selectedEndDate && 
-                                        isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) && 
-                                        styles.selectedDateText
-                                    ]}>
-                                        {format(startOfMonth(addDays(new Date(), 31)), 'MMM d')} - {format(endOfMonth(addDays(new Date(), 31)), 'MMM d')}
-                                    </Text>
-                                </View>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity 
-                                style={[
-                                    styles.dateOption,
-                                    selectedStartDate && selectedEndDate && 
-                                    !isSameDay(selectedStartDate, new Date()) && 
-                                    !isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) && 
-                                    styles.selectedDateOption
-                                ]}
-                                onPress={() => handleDateSelection('custom')}
-                            >
-                                <Ionicons 
-                                    name="calendar-outline" 
-                                    size={24} 
-                                    color={selectedStartDate && selectedEndDate && 
-                                          !isSameDay(selectedStartDate, new Date()) && 
-                                          !isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) ? 
-                                          colors.background : colors.primary} 
-                                />
-                                <View style={styles.dateOptionText}>
-                                    <Text style={[
-                                        styles.dateOptionTitle,
-                                        selectedStartDate && selectedEndDate && 
-                                        !isSameDay(selectedStartDate, new Date()) && 
-                                        !isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) && 
-                                        styles.selectedDateText
-                                    ]}>Custom Period</Text>
-                                    <Text style={[
-                                        styles.dateOptionSubtitle,
-                                        selectedStartDate && selectedEndDate && 
-                                        !isSameDay(selectedStartDate, new Date()) && 
-                                        !isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) && 
-                                        styles.selectedDateText
-                                    ]}>Choose your own start and end dates</Text>
-                                </View>
-                            </TouchableOpacity>
-
-                            <View style={styles.selectedDatesContainer}>
-                                <View style={styles.selectedDateRow}>
-                                    <TouchableOpacity 
-                                        style={[styles.selectedDateButton, { flex: 1 }]}
-                                        onPress={() => handleShowCalendar('start')}
-                                    >
-                                        <Text style={styles.selectedDateLabel}>Start:</Text>
-                                        <Text style={styles.selectedDateValue}>
-                                            {selectedStartDate ? formatDate(selectedStartDate, 'MMM d, yyyy') : 'Select Start Date'}
-                                        </Text>
-                                        <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity 
-                                        style={[styles.selectedDateButton, { flex: 1 }]}
-                                        onPress={() => handleShowCalendar('end')}
-                                    >
-                                        <Text style={styles.selectedDateLabel}>End:</Text>
-                                        <Text style={styles.selectedDateValue}>
-                                            {selectedEndDate ? formatDate(selectedEndDate, 'MMM d, yyyy') : 'Select End Date'}
-                                        </Text>
-                                        <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-                                    </TouchableOpacity>
-                                </View>
-                                {selectedStartDate && selectedEndDate && (
-                                    <Text style={styles.dateRangeSummary}>
-                                        Duration: {differenceInDays(selectedEndDate, selectedStartDate) + 1} days
-                                    </Text>
-                                )}
-                            </View>
-
-                            {dateError ? (
-                                <Text style={styles.errorText}>{dateError}</Text>
-                            ) : null}
-                        </View>
-                    </ScrollView>
-                );
-            // Add more cases for additional steps
-            default:
-                return null;
-        }
-    };
+    const renderEmptyState = () => (
+        <View style={styles.emptyStateContainer}>
+            <Ionicons name="wallet-outline" size={80} color={colors.primary} />
+            <Text style={styles.emptyStateTitle}>No Budgets Yet</Text>
+            <Text style={styles.emptyStateText}>
+                Start managing your finances better by creating your first budget.
+                Track your spending and achieve your financial goals!
+            </Text>
+            <Button
+                onPress={handleCreateBudget}
+                style={styles.emptyStateButton}
+                fullWidth
+            >
+                Create Your First Budget
+            </Button>
+        </View>
+    );
 
     return (
         <SafeAreaView style={styles.container}>
@@ -500,279 +403,67 @@ const BudgetsScreen: React.FC = () => {
                     </Text>
                 </View>
 
-                <View style={styles.buttonContainer}>
-                    <Button
-                        onPress={handleCreateBudget}
-                        style={styles.createButton}
-                        fullWidth
-                    >
-                        + Create New Budget
-                    </Button>
-                </View>
-
-                <View style={styles.tabs}>
-                    <TouchableOpacity
-                        style={[styles.tab, activeTab === 'active' && styles.activeTab]}
-                        onPress={() => setActiveTab('active')}
-                    >
-                        <Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>
-                            Active Budgets
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.tab, activeTab === 'past' && styles.activeTab]}
-                        onPress={() => setActiveTab('past')}
-                    >
-                        <Text style={[styles.tabText, activeTab === 'past' && styles.activeTabText]}>
-                            Past Budgets
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                {renderBudgetCard(sampleBudget)}
-            </ScrollView>
-
-            {/* Budget Creation Modal */}
-            <Modal
-                visible={isModalVisible}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setIsModalVisible(false)}
-            >
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalBody}>
-                            <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Create New Budget</Text>
-                                <TouchableOpacity 
-                                    style={styles.closeButton}
-                                    onPress={() => {
-                                        setIsModalVisible(false);
-                                        setCurrentStep(1);
-                                        setSelectedStartDate(null);
-                                        setSelectedEndDate(null);
-                                        setBudgetName('');
-                                        setTotalAmount('');
-                                    }}
-                                >
-                                    <Ionicons name="close" size={24} color={colors.text} />
-                                </TouchableOpacity>
-                            </View>
-                            <Text style={styles.modalSubtitle}>
-                                Set up your budget details. You'll be able to add categories in the next step.
-                            </Text>
-
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Budget Name</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="e.g. November 2023"
-                                    placeholderTextColor={colors.textSecondary}
-                                    value={budgetName}
-                                    onChangeText={setBudgetName}
-                                />
-                            </View>
-
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Total Budget Amount (₹)</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="e.g. 12000"
-                                    keyboardType="numeric"
-                                    placeholderTextColor={colors.textSecondary}
-                                    value={totalAmount}
-                                    onChangeText={setTotalAmount}
-                                />
-                            </View>
-
-                            <View style={styles.dateContainer}>
-                                <Text style={styles.label}>Budget Duration</Text>
-                                <TouchableOpacity 
-                                    style={[
-                                        styles.dateOption,
-                                        !selectedStartDate && !selectedEndDate && styles.selectedDateOption
-                                    ]}
-                                    onPress={() => handleDateSelection('current')}
-                                >
-                                    <Ionicons 
-                                        name="calendar-outline" 
-                                        size={24} 
-                                        color={!selectedStartDate && !selectedEndDate ? colors.background : colors.primary} 
-                                    />
-                                    <View style={styles.dateOptionText}>
-                                        <Text style={[
-                                            styles.dateOptionTitle,
-                                            !selectedStartDate && !selectedEndDate && styles.selectedDateText
-                                        ]}>Rest of Current Month</Text>
-                                        <Text style={[
-                                            styles.dateOptionSubtitle,
-                                            !selectedStartDate && !selectedEndDate && styles.selectedDateText
-                                        ]}>
-                                            {format(new Date(), 'MMM d')} - {format(endOfMonth(new Date()), 'MMM d')}
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity 
-                                    style={[
-                                        styles.dateOption,
-                                        selectedStartDate && selectedEndDate && 
-                                        isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) && 
-                                        styles.selectedDateOption
-                                    ]}
-                                    onPress={() => handleDateSelection('next')}
-                                >
-                                    <Ionicons 
-                                        name="calendar-outline" 
-                                        size={24} 
-                                        color={selectedStartDate && selectedEndDate && 
-                                              isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) ? 
-                                              colors.background : colors.primary} 
-                                    />
-                                    <View style={styles.dateOptionText}>
-                                        <Text style={[
-                                            styles.dateOptionTitle,
-                                            selectedStartDate && selectedEndDate && 
-                                            isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) && 
-                                            styles.selectedDateText
-                                        ]}>Next Month</Text>
-                                        <Text style={[
-                                            styles.dateOptionSubtitle,
-                                            selectedStartDate && selectedEndDate && 
-                                            isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) && 
-                                            styles.selectedDateText
-                                        ]}>
-                                            {format(startOfMonth(addDays(new Date(), 31)), 'MMM d')} - {format(endOfMonth(addDays(new Date(), 31)), 'MMM d')}
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity 
-                                    style={[
-                                        styles.dateOption,
-                                        selectedStartDate && selectedEndDate && 
-                                        !isSameDay(selectedStartDate, new Date()) && 
-                                        !isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) && 
-                                        styles.selectedDateOption
-                                    ]}
-                                    onPress={() => handleDateSelection('custom')}
-                                >
-                                    <Ionicons 
-                                        name="calendar-outline" 
-                                        size={24} 
-                                        color={selectedStartDate && selectedEndDate && 
-                                              !isSameDay(selectedStartDate, new Date()) && 
-                                              !isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) ? 
-                                              colors.background : colors.primary} 
-                                    />
-                                    <View style={styles.dateOptionText}>
-                                        <Text style={[
-                                            styles.dateOptionTitle,
-                                            selectedStartDate && selectedEndDate && 
-                                            !isSameDay(selectedStartDate, new Date()) && 
-                                            !isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) && 
-                                            styles.selectedDateText
-                                        ]}>Custom Period</Text>
-                                        <Text style={[
-                                            styles.dateOptionSubtitle,
-                                            selectedStartDate && selectedEndDate && 
-                                            !isSameDay(selectedStartDate, new Date()) && 
-                                            !isSameDay(selectedStartDate, startOfMonth(addDays(new Date(), 1))) && 
-                                            styles.selectedDateText
-                                        ]}>Choose your own start and end dates</Text>
-                                    </View>
-                                </TouchableOpacity>
-
-                                <View style={styles.selectedDatesContainer}>
-                                    <View style={styles.selectedDateRow}>
-                                        <TouchableOpacity 
-                                            style={[styles.selectedDateButton, { flex: 1 }]}
-                                            onPress={() => handleShowCalendar('start')}
-                                        >
-                                            <Text style={styles.selectedDateLabel}>Start:</Text>
-                                            <Text style={styles.selectedDateValue}>
-                                                {selectedStartDate ? formatDate(selectedStartDate, 'MMM d, yyyy') : 'Select Start Date'}
-                                            </Text>
-                                            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity 
-                                            style={[styles.selectedDateButton, { flex: 1 }]}
-                                            onPress={() => handleShowCalendar('end')}
-                                        >
-                                            <Text style={styles.selectedDateLabel}>End:</Text>
-                                            <Text style={styles.selectedDateValue}>
-                                                {selectedEndDate ? formatDate(selectedEndDate, 'MMM d, yyyy') : 'Select End Date'}
-                                            </Text>
-                                            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-                                        </TouchableOpacity>
-                                    </View>
-                                    {selectedStartDate && selectedEndDate && (
-                                        <Text style={styles.dateRangeSummary}>
-                                            Duration: {differenceInDays(selectedEndDate, selectedStartDate) + 1} days
-                                        </Text>
-                                    )}
-                                </View>
-
-                                {dateError ? (
-                                    <Text style={styles.errorText}>{dateError}</Text>
-                                ) : null}
-                            </View>
-                        </View>
-
-                        <View style={styles.modalFooter}>
+                {loading ? (
+                    <ActivityIndicator size="large" color={colors.primary} />
+                ) : !hasAnyBudgets ? (
+                    // Show this only when user has no budgets at all
+                    renderEmptyState()
+                ) : (
+                    <>
+                        <View style={styles.buttonContainer}>
                             <Button
-                                variant="primary"
-                                onPress={() => setCurrentStep(currentStep + 1)}
-                                style={styles.nextButton}
+                                onPress={handleCreateBudget}
+                                style={styles.createButton}
                                 fullWidth
-                                disabled={!isFormValid()}
                             >
-                                Next: Add Categories
+                                + Create New Budget
                             </Button>
                         </View>
-                    </View>
-                </View>
-            </Modal>
 
-            {/* Calendar Modal */}
-            <Modal
-                visible={calendarVisible}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setCalendarVisible(false)}
-            >
-                <View style={styles.calendarModalContainer}>
-                    <View style={styles.calendarModalContent}>
-                        <View style={styles.calendarHeader}>
-                            <Text style={styles.calendarTitle}>
-                                Select {dateType === 'start' ? 'Start' : 'End'} Date
-                            </Text>
-                            <TouchableOpacity 
-                                onPress={() => setCalendarVisible(false)}
-                                style={styles.closeButton}
+                        <View style={styles.tabContainer}>
+                            <TouchableOpacity
+                                style={[styles.tab, activeTab === 'active' && styles.activeTab]}
+                                onPress={() => setActiveTab('active')}
                             >
-                                <Ionicons name="close" size={24} color={colors.text} />
+                                <Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>
+                                    Active
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.tab, activeTab === 'past' && styles.activeTab]}
+                                onPress={() => setActiveTab('past')}
+                            >
+                                <Text style={[styles.tabText, activeTab === 'past' && styles.activeTabText]}>
+                                    Past
+                                </Text>
                             </TouchableOpacity>
                         </View>
-                        <Calendar
-                            minDate={dateType === 'start' ? format(new Date(), 'yyyy-MM-dd') : 
-                                   selectedStartDate ? format(selectedStartDate, 'yyyy-MM-dd') : undefined}
-                            onDayPress={handleDateSelect}
-                            markedDates={getMarkedDates()}
-                            theme={{
-                                selectedDayBackgroundColor: colors.primary,
-                                todayTextColor: colors.primary,
-                                arrowColor: colors.primary,
-                                monthTextColor: colors.text,
-                                textDayFontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-                                textMonthFontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-                                textDayHeaderFontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-                            }}
-                        />
-                    </View>
-                </View>
-            </Modal>
+
+                        <View style={styles.monthContainer}>
+                            <TouchableOpacity onPress={handlePreviousMonth} style={styles.monthArrow}>
+                                <Ionicons name="chevron-back" size={24} color={colors.text} />
+                            </TouchableOpacity>
+                            <Text style={styles.monthText}>
+                                {format(currentDate, 'MMMM yyyy')}
+                            </Text>
+                            <TouchableOpacity onPress={handleNextMonth} style={styles.monthArrow}>
+                                <Ionicons name="chevron-forward" size={24} color={colors.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {budgets.length === 0 ? (
+                            <View style={styles.noMonthBudgetsContainer}>
+                                <Ionicons name="calendar-outline" size={40} color={colors.textSecondary} />
+                                <Text style={styles.noMonthBudgetsText}>
+                                    No budgets for {format(currentDate, 'MMMM yyyy')}
+                                </Text>
+                            </View>
+                        ) : (
+                            budgets.map(renderBudgetCard)
+                        )}
+                    </>
+                )}
+            </ScrollView>
         </SafeAreaView>
     );
 };
@@ -781,13 +472,14 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
-    },
+    } as ViewStyle,
     scrollView: {
         flex: 1,
-    },
+    } as ViewStyle,
     header: {
         padding: spacing.lg,
-    },
+        paddingTop: 0,
+    } as ViewStyle,
     title: {
         fontSize: typography.sizes['2xl'],
         fontWeight: typography.weights.bold,
@@ -806,11 +498,11 @@ const styles = StyleSheet.create({
     createButton: {
         width: '100%',
     },
-    tabs: {
+    tabContainer: {
         flexDirection: 'row',
         marginHorizontal: spacing.lg,
-        marginBottom: spacing.lg,
-    },
+        marginBottom: spacing.md,
+    } as ViewStyle,
     tab: {
         flex: 1,
         paddingVertical: spacing.sm,
@@ -832,94 +524,66 @@ const styles = StyleSheet.create({
         marginHorizontal: spacing.lg,
         marginBottom: spacing.lg,
         padding: spacing.lg,
+        backgroundColor: colors.background,
+        borderRadius: borderRadius.lg,
+        ...shadows.md,
     },
     budgetHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: spacing.lg,
+        marginBottom: spacing.md,
     },
     budgetTitle: {
         fontSize: typography.sizes.xl,
         fontWeight: typography.weights.bold,
         color: colors.text,
-        marginBottom: spacing.xs,
     },
     budgetDate: {
         fontSize: typography.sizes.sm,
         color: colors.textSecondary,
+        marginTop: spacing.xs,
     },
-    moreButton: {
+    deleteButton: {
         padding: spacing.xs,
     },
-    overview: {
+    budgetInfo: {
+        marginBottom: spacing.md,
+    },
+    budgetRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: spacing.lg,
-        backgroundColor: colors.secondary,
-        padding: spacing.md,
-        borderRadius: borderRadius.lg,
-    },
-    overviewItem: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    overviewDivider: {
-        width: 1,
-        height: '100%',
-        backgroundColor: colors.border,
-        marginHorizontal: spacing.md,
-    },
-    overviewLabel: {
-        fontSize: typography.sizes.sm,
-        color: colors.textSecondary,
         marginBottom: spacing.xs,
     },
-    overviewAmount: {
+    budgetLabel: {
+        fontSize: typography.sizes.base,
+        color: colors.textSecondary,
+    },
+    budgetAmount: {
         fontSize: typography.sizes.lg,
         fontWeight: typography.weights.bold,
         color: colors.text,
     },
-    progressContainer: {
-        marginBottom: spacing.lg,
-    },
-    progressHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+    spentText: {
+        fontSize: typography.sizes.base,
+        color: colors.textSecondary,
         marginBottom: spacing.xs,
     },
-    progressLabel: {
-        fontSize: typography.sizes.sm,
-        color: colors.text,
-    },
     daysLeft: {
-        fontSize: typography.sizes.sm,
-        color: colors.primary,
-        fontWeight: typography.weights.medium,
-    },
-    progressBar: {
-        height: 8,
-        backgroundColor: colors.secondary,
-        borderRadius: borderRadius.full,
-        overflow: 'hidden',
-    },
-    progressFill: {
-        height: '100%',
-        borderRadius: borderRadius.full,
-    },
-    dailyBudgetContainer: {
-        backgroundColor: colors.secondary,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
+        fontSize: typography.sizes.base,
+        color: colors.textSecondary,
         marginBottom: spacing.lg,
     },
-    dailyBudgetContent: {
+    dailyBudgetContainer: {
         flexDirection: 'row',
         alignItems: 'center',
+        marginBottom: spacing.lg,
+        backgroundColor: colors.secondary,
+        padding: spacing.md,
+        borderRadius: borderRadius.lg,
     },
-    dailyBudgetText: {
+    dailyBudgetContent: {
         marginLeft: spacing.sm,
     },
     dailyBudgetLabel: {
@@ -927,12 +591,12 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
     },
     dailyBudgetAmount: {
-        fontSize: typography.sizes.lg,
+        fontSize: typography.sizes.base,
         fontWeight: typography.weights.bold,
         color: colors.text,
     },
     categorySection: {
-        marginBottom: spacing.lg,
+        marginTop: spacing.lg,
     },
     sectionTitle: {
         fontSize: typography.sizes.base,
@@ -940,200 +604,119 @@ const styles = StyleSheet.create({
         color: colors.text,
         marginBottom: spacing.md,
     },
-    categoryItem: {
-        marginBottom: spacing.md,
-    },
-    categoryHeader: {
+    categoryRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: spacing.xs,
+        paddingVertical: spacing.sm,
     },
-    categoryTitleSection: {
+    categoryNameContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    categoryDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        marginRight: spacing.xs,
+        gap: spacing.sm,
     },
     categoryName: {
-        fontSize: typography.sizes.sm,
+        fontSize: typography.sizes.base,
         color: colors.text,
     },
     categoryAmount: {
-        fontSize: typography.sizes.sm,
+        fontSize: typography.sizes.base,
         color: colors.textSecondary,
     },
-    categoryProgress: {
-        height: 4,
-        backgroundColor: colors.secondary,
-        borderRadius: borderRadius.full,
-        overflow: 'hidden',
+    emptyText: {
+        textAlign: 'center',
+        color: colors.textSecondary,
+        fontStyle: 'italic',
     },
-    categoryProgressFill: {
-        height: '100%',
-        borderRadius: borderRadius.full,
-    },
-    modalContainer: {
+    emptyStateContainer: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        backgroundColor: colors.background,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        height: '90%',
-        display: 'flex',
-        flexDirection: 'column',
-    },
-    modalBody: {
-        flex: 1,
-        padding: spacing.lg,
-    },
-    modalFooter: {
-        padding: spacing.lg,
-        paddingBottom: Platform.OS === 'ios' ? 34 : spacing.xl,
-        backgroundColor: colors.background,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        gap: spacing.md,
-    },
-    nextButton: {
-        marginBottom: spacing.xs,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: spacing.xs,
+        justifyContent: 'center',
+        padding: spacing.xl,
+        marginTop: spacing.xl * 2,
     },
-    modalTitle: {
+    emptyStateTitle: {
         fontSize: typography.sizes.xl,
         fontWeight: typography.weights.bold,
         color: colors.text,
+        marginTop: spacing.lg,
+        marginBottom: spacing.sm,
+        textAlign: 'center',
     },
-    closeButton: {
-        padding: spacing.xs,
-        marginRight: -spacing.xs,
-    },
-    modalSubtitle: {
+    emptyStateText: {
         fontSize: typography.sizes.base,
         color: colors.textSecondary,
+        textAlign: 'center',
         marginBottom: spacing.xl,
+        lineHeight: typography.sizes.xl,
     },
-    formGroup: {
-        marginBottom: spacing.lg,
+    emptyStateButton: {
+        marginTop: spacing.lg,
     },
-    label: {
-        fontSize: typography.sizes.sm,
-        color: colors.text,
-        marginBottom: spacing.xs,
-    },
-    input: {
-        backgroundColor: colors.secondary,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        fontSize: typography.sizes.base,
-        color: colors.text,
-    },
-    dateContainer: {
-        gap: spacing.md,
-        marginBottom: spacing.xl,
-    },
-    dateOption: {
+    monthContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.secondary,
-        padding: spacing.md,
-        borderRadius: borderRadius.lg,
-        gap: spacing.sm,
-    },
-    selectedDateOption: {
-        backgroundColor: colors.primary,
-    },
-    selectedDateText: {
-        color: colors.background,
-    },
-    dateOptionText: {
-        flex: 1,
-    },
-    dateOptionTitle: {
-        fontSize: typography.sizes.base,
-        fontWeight: typography.weights.medium,
-        color: colors.text,
-    },
-    dateOptionSubtitle: {
-        fontSize: typography.sizes.sm,
-        color: colors.textSecondary,
-    },
-    selectedDatesContainer: {
-        marginTop: spacing.md,
-    },
-    selectedDateRow: {
-        flexDirection: 'row',
-        gap: spacing.md,
-        marginBottom: spacing.xs,
-    },
-    selectedDateButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.background,
-        padding: spacing.sm,
-        borderRadius: borderRadius.md,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    selectedDateLabel: {
-        fontSize: typography.sizes.sm,
-        color: colors.textSecondary,
-        marginRight: spacing.xs,
-    },
-    selectedDateValue: {
-        fontSize: typography.sizes.sm,
-        color: colors.text,
-        fontWeight: typography.weights.medium,
-        flex: 1,
-        marginRight: spacing.xs,
-    },
-    dateRangeSummary: {
-        fontSize: typography.sizes.sm,
-        color: colors.textSecondary,
-        marginTop: spacing.sm,
-    },
-    errorText: {
-        color: colors.error,
-        fontSize: typography.sizes.sm,
-        marginTop: spacing.xs,
-    },
-    calendarModalContainer: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'center',
-        padding: spacing.lg,
-    },
-    calendarModalContent: {
-        backgroundColor: colors.background,
-        borderRadius: borderRadius.lg,
-        padding: spacing.lg,
-    },
-    calendarHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: spacing.md,
-    },
-    calendarTitle: {
-        fontSize: typography.sizes.lg,
+        paddingVertical: spacing.md,
+        marginBottom: spacing.lg,
+    } as ViewStyle,
+    monthArrow: {
+        padding: spacing.sm,
+    } as ViewStyle,
+    monthText: {
+        fontSize: typography.sizes.xl,
         fontWeight: typography.weights.bold,
         color: colors.text,
+        marginHorizontal: spacing.lg,
     },
-    modalContentContainer: {
-        paddingHorizontal: spacing.lg,
-        paddingBottom: spacing.xl,
+    noMonthBudgetsContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: spacing.xl,
+        marginTop: spacing.xl * 2,
+    },
+    noMonthBudgetsText: {
+        fontSize: typography.sizes.xl,
+        fontWeight: typography.weights.bold,
+        color: colors.textSecondary,
+        marginTop: spacing.lg,
+        marginBottom: spacing.sm,
+        textAlign: 'center',
+    },
+    negativeAmount: {
+        color: colors.error
+    },
+    positiveAmount: {
+        color: colors.success
+    },
+    availableMessage: {
+        fontSize: typography.sizes.sm,
+        color: colors.textSecondary,
+        marginTop: spacing.xs,
+        marginBottom: spacing.sm,
+        paddingHorizontal: spacing.sm,
+    },
+    warningMessage: {
+        color: colors.error,
+    },
+    overBudgetContainer: {
+        backgroundColor: colors.error + '15', // 15% opacity
+        borderWidth: 1,
+        borderColor: colors.error,
+    },
+    overBudgetLabel: {
+        color: colors.error,
+        fontWeight: typography.weights.medium,
+    },
+    overBudgetAmount: {
+        color: colors.error,
+        fontWeight: typography.weights.bold,
+    },
+    unbudgetedLabel: {
+        fontSize: typography.sizes.sm,
+        color: colors.textSecondary,
+        fontStyle: 'italic',
     },
 });
 

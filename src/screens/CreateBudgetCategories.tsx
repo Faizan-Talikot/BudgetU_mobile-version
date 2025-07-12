@@ -15,42 +15,77 @@ import { colors, typography, spacing, borderRadius } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../components/Button';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { categoryAPI } from '../services/api';
+import { Category, DBCategory, CreateCategoryPayload } from '../types/category';
 
-interface Category {
+// Update the BudgetCategoryWithAmount interface
+interface BudgetCategoryWithAmount {
     id: string;
+    dbId?: string;  // Store the database ID separately from the client-side id
     name: string;
-    amount: string;
-    color: string;
+    type: 'income' | 'expense';
     icon: string;
+    color: string;
+    amount: string;
     isAmountConfirmed?: boolean;
+    isCustom?: boolean;
+    isDefault?: boolean;  // Whether it's a default/predefined category
+    allocated: number;
+    spent?: number;
+    categoryId: string;
+    isPredefined: boolean;
 }
 
-// Predefined categories with icons and colors
-const suggestedCategories: Omit<Category, 'id' | 'amount'>[] = [
-    { name: 'Food & Dining', color: '#FF6B6B', icon: 'restaurant' },
-    { name: 'Transportation', color: '#4ECDC4', icon: 'bus' },
-    { name: 'Entertainment', color: '#45B7D1', icon: 'game-controller' },
-    { name: 'Shopping', color: '#96CEB4', icon: 'cart' },
-    { name: 'Bills & Utilities', color: '#FFBE0B', icon: 'receipt' },
-    { name: 'Education', color: '#FF006E', icon: 'school' },
-    { name: 'Health & Wellness', color: '#8338EC', icon: 'medical' },
-    { name: 'Personal Care', color: '#3A86FF', icon: 'person' },
-    { name: 'Savings', color: '#38B000', icon: 'wallet' },
-];
+// Type guard to check if a category is a DBCategory
+const isDBCategory = (category: any): category is DBCategory => {
+    return (
+        '_id' in category &&
+        'user' in category &&
+        'createdAt' in category &&
+        'updatedAt' in category
+    );
+};
+
+// Type guard to check if a category is a predefined category
+const isPredefinedCategory = (category: any): boolean => {
+    return category.isDefault === true;
+};
 
 const { width } = Dimensions.get('window');
 
 const CreateBudgetCategories: React.FC = () => {
     const navigation = useNavigation();
     const route = useRoute();
-    const { amount: totalBudget, name: budgetName, startDate, endDate } = 
-        route.params as { amount: number; name: string; startDate: string; endDate: string };
+    const { amount: totalBudget, name: budgetName, startDate, endDate, existingIncome } = 
+        route.params as { 
+            amount: number; 
+            name: string; 
+            startDate: string; 
+            endDate: string;
+            existingIncome?: number;
+        };
 
-    const [categories, setCategories] = useState<Category[]>([]);
+    const [categories, setCategories] = useState<BudgetCategoryWithAmount[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(true);
-    const [newCategoryName, setNewCategoryName] = useState('');
-    const [isAddingCategory, setIsAddingCategory] = useState(false);
-    const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
+    const [availableCategories, setAvailableCategories] = useState<DBCategory[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const initializeCategories = async () => {
+            try {
+                const allCategories = await categoryAPI.getAll();
+                // Filter out income categories
+                const expenseCategories = allCategories.filter(cat => cat.type === 'expense');
+                setAvailableCategories(expenseCategories);
+                setIsLoading(false);
+            } catch (error) {
+                console.error('Error loading categories:', error);
+                setIsLoading(false);
+            }
+        };
+        
+        initializeCategories();
+    }, []);
 
     // Calculate remaining amount
     const allocatedAmount = categories.reduce((sum, category) => {
@@ -60,32 +95,85 @@ const CreateBudgetCategories: React.FC = () => {
     const remainingAmount = totalBudget - allocatedAmount;
 
     // Filter out already selected categories from suggestions
-    const availableSuggestedCategories = suggestedCategories.filter(
-        suggested => !categories.some(cat => cat.name === suggested.name)
+    const availableSuggestedCategories = availableCategories.filter(
+        dbCat => !categories.some(cat => 
+            (cat.isDefault && cat.id === (dbCat as any).id) || 
+            (!cat.isDefault && cat.dbId === dbCat._id)
+        )
     );
 
-    const handleAddSuggestedCategory = (category: Omit<Category, 'id' | 'amount'>) => {
-        const newCategory: Category = {
-            ...category,
-            id: Math.random().toString(),
-            amount: '',
-        };
-        setCategories([...categories, newCategory]);
-    };
+    const handleAddSuggestedCategory = async (category: DBCategory & { id?: string }) => {
+        // For predefined categories, use the predefined ID
+        const isPredefined = category.isDefault;
+        let categoryId = isPredefined ? (category.id || '') : category._id;
 
-    const handleAddCustomCategory = () => {
-        if (newCategoryName.trim()) {
-            const newCategory: Category = {
-                id: Math.random().toString(),
-                name: newCategoryName.trim(),
-                amount: '',
-                color: suggestedCategories[categories.length % suggestedCategories.length].color,
-                icon: 'bookmark',
-            };
-            setCategories([...categories, newCategory]);
-            setNewCategoryName('');
-            setIsAddingCategory(false);
+        if (!categoryId) {
+            console.error('Invalid category ID:', category);
+            Alert.alert('Error', 'Invalid category data');
+            return;
         }
+
+        // Check if category is already selected
+        if (categories.some(cat =>
+            (isPredefined && cat.id === categoryId) ||
+            (!isPredefined && cat.dbId === categoryId)
+        )) {
+            Alert.alert('Already Selected', 'This category has already been added to your budget.');
+            return;
+        }
+
+        // --- FIXED: Check if predefined category already exists in DB before creating ---
+        if (isPredefined) {
+            try {
+                console.log('Checking if predefined category already exists in DB:', category.name, 'Type:', category.type);
+                
+                // Check if this predefined category already exists in the user's database
+                // We need to look at ALL categories (both predefined and user-created) that the user has
+                const allUserCategories = await categoryAPI.getAll();
+                const existingCategory = allUserCategories.find(cat => 
+                    cat.name.toLowerCase() === category.name.toLowerCase() && 
+                    cat.type === category.type &&
+                    cat.isCustom // This means it was created by the user (not predefined)
+                );
+
+                if (existingCategory) {
+                    // Use the existing category from database
+                    console.log('Found existing category in DB, using it:', existingCategory._id);
+                    categoryId = existingCategory._id;
+                } else {
+                    // Create new category in DB only if it doesn't exist
+                    console.log('Creating predefined category in DB:', category.name, 'Type:', category.type);
+                    const created = await categoryAPI.create({
+                        name: category.name,
+                        type: category.type,
+                        icon: category.icon,
+                        color: category.color
+                    });
+                    categoryId = created._id; // Use the real database ID
+                    console.log('Created category with ID:', categoryId);
+                }
+            } catch (e) {
+                console.error('Error handling predefined category:', e);
+                Alert.alert('Error', 'Failed to process category');
+                return;
+            }
+        }
+
+        const newCategory: BudgetCategoryWithAmount = {
+            id: categoryId, // Use the real database ID
+            dbId: categoryId, // Store the database ID for all categories
+            name: category.name,
+            type: category.type,
+            icon: category.icon === 'default-icon' ? 'wallet-outline' : category.icon,
+            color: category.color || colors.primary,
+            amount: '',
+            isCustom: !isPredefined,
+            isDefault: isPredefined,
+            allocated: 0,
+            categoryId: categoryId, // Use the real database ID
+            isPredefined: false
+        };
+        setCategories(prev => [...prev, newCategory]);
     };
 
     const handleUpdateAmount = (id: string, amount: string) => {
@@ -116,7 +204,12 @@ const CreateBudgetCategories: React.FC = () => {
 
         setCategories(prevCategories => 
             prevCategories.map(category => 
-                category.id === id ? { ...category, amount: cleanedAmount, isAmountConfirmed: false } : category
+                category.id === id ? { 
+                    ...category, 
+                    amount: cleanedAmount, 
+                    allocated: newAmount, // Update allocated field as well
+                    isAmountConfirmed: false 
+                } : category
             )
         );
     };
@@ -125,9 +218,15 @@ const CreateBudgetCategories: React.FC = () => {
         const category = categories.find(c => c.id === id);
         if (!category || !category.amount) return;
 
+        const confirmedAmount = parseFloat(category.amount) || 0;
+
         setCategories(prevCategories => 
             prevCategories.map(cat => 
-                cat.id === id ? { ...cat, isAmountConfirmed: true } : cat
+                cat.id === id ? { 
+                    ...cat, 
+                    allocated: confirmedAmount, // Update allocated field when confirming
+                    isAmountConfirmed: true 
+                } : cat
             )
         );
     };
@@ -136,32 +235,72 @@ const CreateBudgetCategories: React.FC = () => {
         setCategories(categories.filter(category => category.id !== id));
     };
 
-    const handleCreateBudget = () => {
-        // Navigate to review screen with both allocated and unallocated amounts
-        navigation.navigate('CreateBudgetReview', {
+    const handleContinue = () => {
+        // Calculate unallocated amount
+        const totalAllocated = categories.reduce((sum, cat) => sum + parseFloat(cat.amount) || 0, 0);
+        const unallocatedAmount = totalBudget - totalAllocated;
+
+        console.log('Categories screen passing data:', {
             amount: totalBudget,
             name: budgetName,
             startDate,
             endDate,
-            categories: categories
-                .filter(cat => cat.isAmountConfirmed && parseFloat(cat.amount) > 0)
-                .map(cat => ({
+            unallocatedAmount,
+            categories: categories.map(cat => ({
+                name: cat.name,
+                allocated: parseFloat(cat.amount) || 0,
+                spent: cat.spent || 0,
+                color: cat.color,
+                categoryId: cat.id,
+                isPredefined: cat.isDefault || false
+            })),
+            existingIncome: existingIncome
+        });
+
+        // Navigate to review screen
+        navigation.navigate('CreateBudget' as any, {
+            screen: 'CreateBudgetReview',
+            params: {
+                amount: totalBudget,
+                name: budgetName,
+                startDate,
+                endDate,
+                unallocatedAmount,
+                categories: categories.map(cat => ({
                     name: cat.name,
-                    allocated: parseFloat(cat.amount),
-                    spent: 0,
+                    allocated: parseFloat(cat.amount) || 0,
+                    spent: cat.spent || 0,
                     color: cat.color,
+                    categoryId: cat.id,
+                    isPredefined: cat.isDefault || false
                 })),
-            unallocatedAmount: remainingAmount
+                existingIncome: existingIncome
+            }
         });
     };
 
     const isValid = () => {
-        // Allow proceeding if at least one category has a confirmed amount and valid amount
         return categories.some(cat => 
             cat.isAmountConfirmed && 
             parseFloat(cat.amount) > 0
         );
     };
+
+    // Add error handling for empty categories
+    useEffect(() => {
+        if (!isLoading && availableCategories.length === 0) {
+            Alert.alert(
+                'No Categories Available',
+                'Please create some categories first before creating a budget.',
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => navigation.goBack()
+                    }
+                ]
+            );
+        }
+    }, [isLoading, availableCategories]);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -253,53 +392,14 @@ const CreateBudgetCategories: React.FC = () => {
                     </View>
                 ))}
 
-                {/* Add Custom Category */}
-                {isAddingCategory ? (
-                    <View style={styles.addCustomCategory}>
-                        <TextInput
-                            style={styles.customCategoryInput}
-                            placeholder="Category name"
-                            placeholderTextColor={colors.textSecondary}
-                            value={newCategoryName}
-                            onChangeText={setNewCategoryName}
-                            autoFocus
-                        />
-                        <View style={styles.customCategoryButtons}>
-                            <Button
-                                variant="outline"
-                                onPress={() => setIsAddingCategory(false)}
-                                style={styles.customCategoryButton}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                variant="primary"
-                                onPress={handleAddCustomCategory}
-                                style={styles.customCategoryButton}
-                                disabled={!newCategoryName.trim()}
-                            >
-                                Add
-                            </Button>
-                        </View>
-                    </View>
-                ) : (
-                    <TouchableOpacity
-                        style={styles.addCategoryButton}
-                        onPress={() => setIsAddingCategory(true)}
-                    >
-                        <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
-                        <Text style={styles.addCategoryText}>Add Custom Category</Text>
-                    </TouchableOpacity>
-                )}
-
-                {/* Suggested Categories - Now always visible if there are available categories */}
-                {availableSuggestedCategories.length > 0 && (
+                {/* Suggested Categories */}
+                {showSuggestions && (
                     <View style={styles.suggestedCategories}>
                         <Text style={styles.suggestedTitle}>Suggested Categories</Text>
                         <View style={styles.suggestedGrid}>
-                            {availableSuggestedCategories.map((category, index) => (
+                            {availableSuggestedCategories.map((category) => (
                                 <TouchableOpacity
-                                    key={index}
+                                    key={category._id}
                                     style={styles.suggestedItem}
                                     onPress={() => handleAddSuggestedCategory(category)}
                                 >
@@ -317,7 +417,7 @@ const CreateBudgetCategories: React.FC = () => {
             <View style={styles.footer}>
                 <Button
                     variant="primary"
-                    onPress={handleCreateBudget}
+                    onPress={handleContinue}
                     fullWidth
                     disabled={!isValid()}
                 >
@@ -436,47 +536,12 @@ const styles = StyleSheet.create({
         color: colors.text,
         padding: 0,
     },
-    addCategoryButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.secondary,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        gap: spacing.sm,
-        marginBottom: spacing.lg,
-    },
-    addCategoryText: {
-        fontSize: typography.sizes.base,
-        color: colors.primary,
-        fontWeight: typography.weights.medium,
-    },
-    addCustomCategory: {
-        backgroundColor: colors.secondary,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        marginBottom: spacing.lg,
-    },
-    customCategoryInput: {
-        backgroundColor: colors.background,
-        borderRadius: borderRadius.md,
-        padding: spacing.sm,
-        fontSize: typography.sizes.base,
-        color: colors.text,
-        marginBottom: spacing.sm,
-    },
-    customCategoryButtons: {
-        flexDirection: 'row',
-        gap: spacing.sm,
-    },
-    customCategoryButton: {
-        flex: 1,
-    },
     suggestedCategories: {
         marginBottom: spacing.xl,
     },
     suggestedTitle: {
-        fontSize: typography.sizes.base,
-        fontWeight: typography.weights.medium,
+        fontSize: typography.sizes.lg,
+        fontWeight: typography.weights.bold,
         color: colors.text,
         marginBottom: spacing.md,
     },
@@ -488,6 +553,7 @@ const styles = StyleSheet.create({
     suggestedItem: {
         width: (width - spacing.lg * 2 - spacing.md * 2) / 3,
         alignItems: 'center',
+        gap: spacing.xs,
     },
     suggestedIcon: {
         width: 48,
@@ -495,7 +561,6 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: spacing.xs,
     },
     suggestedName: {
         fontSize: typography.sizes.sm,
@@ -504,7 +569,6 @@ const styles = StyleSheet.create({
     },
     footer: {
         padding: spacing.lg,
-        paddingBottom: Platform.OS === 'ios' ? 34 : spacing.xl,
         borderTopWidth: 1,
         borderTopColor: colors.border,
     },

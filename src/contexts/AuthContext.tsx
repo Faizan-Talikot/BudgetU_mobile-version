@@ -13,6 +13,12 @@ interface User {
     // Add other user properties as needed
 }
 
+interface AuthData {
+    user: User;
+    token: string;
+    refreshToken: string;
+}
+
 interface AuthContextType {
     user: User | null;
     loading: boolean;
@@ -33,8 +39,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const loadUser = async () => {
         try {
-            const userData = await storage.get<User>(StorageKeys.USER_DATA);
-            setUser(userData);
+            const authData = await storage.get<{user: User; token: string; refreshToken: string}>(StorageKeys.USER_DATA);
+            setUser(authData?.user || null);
         } catch (error) {
             console.error('Error loading user data:', error);
         } finally {
@@ -55,7 +61,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const data = await response.json();
             if (!response.ok) throw new Error(data.message);
 
-            await storage.set(StorageKeys.USER_DATA, data.user);
+            // Store complete auth data including tokens
+            const authData = {
+                user: data.user,
+                token: data.token,
+                refreshToken: data.refreshToken || data.token
+            };
+            await storage.set(StorageKeys.USER_DATA, authData);
             setUser(data.user);
         } catch (error) {
             console.error('Sign in error:', error);
@@ -93,9 +105,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 throw new Error(data.message || 'Registration failed');
             }
 
-            // Store user data
-            await storage.set(StorageKeys.USER_DATA, data.user);
+            // Store auth data with the structure that matches the backend response
+            const authData = {
+                user: data.user,
+                token: data.token,
+                // If refresh token isn't provided, we'll use the same token for now
+                refreshToken: data.refreshToken || data.token
+            };
+            await storage.set(StorageKeys.USER_DATA, authData);
             setUser(data.user);
+
+            // Immediately after storing auth data, verify it was saved
+            const savedData = await storage.get(StorageKeys.USER_DATA);
+            console.log('Stored auth data:', savedData);
         } catch (error) {
             console.error('Detailed signup error:', error);
             if (error instanceof Error) {
