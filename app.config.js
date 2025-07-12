@@ -23,7 +23,10 @@ export default {
     package: 'com.budgetu.app'
   },
   extra: {
-    NODE_ENV: process.env.NODE_ENV || 'development',
-    API_URL: process.env.API_URL || 'http://192.168.0.101:5000/api'
+    NODE_ENV: process.env.NODE_ENV || 'production',
+    API_URL: process.env.API_URL || 'https://budgetu-backend.vercel.app',
+    eas: {
+      projectId: "37667c0a-f44d-4ce7-b15c-7c40319c6f32"
+    }
   }
 }; 
