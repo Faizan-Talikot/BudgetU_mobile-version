@@ -188,7 +188,7 @@ const createTransaction = async (req, res) => {
       amount: Number(amount),
       description,
       category,
-      date: date || new Date(),
+      date: new Date(date), // Properly parse the date string to include time
       isIncome: isIncome || false,
       account,
       paymentMethod: mapAccountTypeToPaymentMethod(accountDoc.type),

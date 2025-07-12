@@ -658,7 +658,7 @@ const TransactionsScreen: React.FC<Props> = ({ navigation }) => {
                 amount: parsedAmount,
                 description: notes || selectedCategory.name,
                 category: categoryId.toString(),
-                date: selectedDate,
+                date: `${selectedDate}T${selectedTime}:00`, // Combine date and time without timezone
                 isIncome: transactionType.toLowerCase() === 'income',
                 account: selectedAccount._id.toString(),
                 paymentMethod: mapAccountTypeToPaymentMethod(selectedAccount.type),
