@@ -24,6 +24,6 @@ export default {
   },
   extra: {
     NODE_ENV: process.env.NODE_ENV || 'development',
-    API_URL: process.env.API_URL || 'http://localhost:5000/api'
+    API_URL: process.env.API_URL || 'http://192.168.0.101:5000/api'
   }
 }; 

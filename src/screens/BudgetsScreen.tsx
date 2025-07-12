@@ -16,6 +16,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { colors, typography, spacing, borderRadius, shadows } from '../theme';
@@ -57,7 +58,8 @@ interface ProcessedBudget extends Omit<Budget, 'categories'> {
 }
 
 const BudgetsScreen: React.FC = () => {
-    const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+    const navigation = useNavigation();
+    const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState('active');
     const [currentDate, setCurrentDate] = useState(new Date());
     const [loading, setLoading] = useState(true);
@@ -164,8 +166,8 @@ const BudgetsScreen: React.FC = () => {
 
     const handleDeleteBudget = async (budgetId: string) => {
         Alert.alert(
-            'Confirm Delete',
-            'Are you sure you want to delete this budget?',
+            'Delete Budget',
+            'Are you sure you want to delete this budget? This action cannot be undone.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -176,6 +178,11 @@ const BudgetsScreen: React.FC = () => {
                             setLoading(true);
                             await budgetAPI.delete(budgetId);
                             setBudgets(prev => prev.filter(b => b._id !== budgetId));
+                            
+                            // Invalidate React Query cache to trigger dashboard update
+                            await queryClient.invalidateQueries({ queryKey: ['activeBudgets'] });
+                            await queryClient.invalidateQueries({ queryKey: ['budgets'] });
+                            
                             Alert.alert('Success', 'Budget deleted successfully');
                         } catch (error) {
                             console.error('Error deleting budget:', error);
@@ -202,11 +209,11 @@ const BudgetsScreen: React.FC = () => {
         const totalAllocated = budget.categories.reduce((sum, cat) => sum + (cat.allocatedAmount || 0), 0);
         const availableToBudget = budget.totalIncome - totalAllocated;
         const remainingAmount = totalAllocated - budget.totalSpent;
-        const daysLeft = differenceInDays(new Date(budget.endDate), new Date());
+        const daysLeft = Math.max(1, differenceInDays(new Date(budget.endDate), new Date()));
         const spentPercentage = (budget.totalSpent / totalAllocated) * 100;
         const isOverBudget = remainingAmount < 0;
         const overBudgetAmount = Math.abs(remainingAmount);
-        const dailyBudget = isOverBudget ? 0 : (remainingAmount / (daysLeft || 1));
+        const dailyBudget = isOverBudget ? 0 : (remainingAmount / daysLeft);
 
         return (
             <Card key={budget._id} style={styles.budgetCard}>
@@ -291,13 +298,13 @@ const BudgetsScreen: React.FC = () => {
                                     Over Budget
                                 </Text>
                                 <Text style={[styles.dailyBudgetAmount, styles.overBudgetAmount]}>
-                                    ₹{overBudgetAmount.toFixed(0)} total overspent
+                                    ₹{Math.floor(overBudgetAmount)} total overspent
                                 </Text>
                             </>
                         ) : (
                             <>
                                 <Text style={styles.dailyBudgetLabel}>Daily Budget</Text>
-                                <Text style={styles.dailyBudgetAmount}>₹{dailyBudget.toFixed(0)}/day</Text>
+                                <Text style={styles.dailyBudgetAmount}>₹{Math.floor(dailyBudget)}/day</Text>
                             </>
                         )}
                     </View>

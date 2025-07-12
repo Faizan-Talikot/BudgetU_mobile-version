@@ -9,6 +9,8 @@ import {
     Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '../components/Card';
 import { colors, typography, spacing } from '../theme';
 import { budgetAPI } from '../services/api';
@@ -16,83 +18,114 @@ import { differenceInDays } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
 
 const DashboardScreen = () => {
-    const [refreshing, setRefreshing] = useState(false);
-    const [dailyBudget, setDailyBudget] = useState(0);
-    const [daysLeft, setDaysLeft] = useState(0);
-    const [monthlyBudget, setMonthlyBudget] = useState(0);
-    const [spentSoFar, setSpentSoFar] = useState(0);
-    const [remaining, setRemaining] = useState(0);
     const [showFeatureModal, setShowFeatureModal] = useState(false);
     const [featureModalText, setFeatureModalText] = useState('Can I Afford This?');
 
-    const fetchBudgetData = async () => {
-        try {
+    // Use React Query to fetch budget data with automatic refetching
+    const {
+        data: budgetData,
+        isLoading,
+        error,
+        refetch,
+        isRefetching
+    } = useQuery({
+        queryKey: ['activeBudgets'],
+        queryFn: async () => {
             const budgets = await budgetAPI.getActive();
-            if (budgets && budgets.length > 0) {
-                const budget = budgets[0];
-                setMonthlyBudget(budget.amount);
-                setSpentSoFar(budget.totalSpent);
-                // Calculate totalAllocated
-                const totalAllocated = budget.categories.reduce((sum, cat) => sum + (cat.allocatedAmount || 0), 0);
-                // Calculate remainingAmount
-                const remainingAmount = totalAllocated - budget.totalSpent;
-                setRemaining(remainingAmount);
-                // Calculate days left
-                const today = new Date();
-                const end = new Date(budget.endDate);
-                const days = Math.max(1, differenceInDays(end, today));
-                setDaysLeft(days);
-                // Calculate daily budget
-                const isOverBudget = remainingAmount < 0;
-                const daily = isOverBudget ? 0 : (remainingAmount / (days || 1));
-                setDailyBudget(Math.floor(daily));
-            }
-        } catch (e) {
-            setMonthlyBudget(0);
-            setSpentSoFar(0);
-            setRemaining(0);
-            setDailyBudget(0);
-            setDaysLeft(0);
+            return budgets && budgets.length > 0 ? budgets[0] : null;
+        },
+        staleTime: 30000, // Consider data stale after 30 seconds
+        refetchOnWindowFocus: true,
+        refetchOnMount: true,
+    });
+
+    // Calculate dashboard values from budget data
+    const calculateDashboardValues = (budget: any) => {
+        if (!budget) {
+            return {
+                dailyBudget: 0,
+                daysLeft: 0,
+                monthlyBudget: 0,
+                spentSoFar: 0,
+                remaining: 0
+            };
         }
+
+        const monthlyBudget = budget.amount;
+        const spentSoFar = budget.totalSpent;
+        const totalAllocated = budget.categories.reduce((sum: number, cat: any) => sum + (cat.allocatedAmount || 0), 0);
+        const remainingAmount = totalAllocated - budget.totalSpent;
+        
+        // Calculate days left
+        const today = new Date();
+        const end = new Date(budget.endDate);
+        const days = Math.max(1, differenceInDays(end, today));
+        
+        // Calculate daily budget
+        const isOverBudget = remainingAmount < 0;
+        const daily = isOverBudget ? 0 : (remainingAmount / days);
+
+        return {
+            dailyBudget: Math.floor(daily),
+            daysLeft: days,
+            monthlyBudget,
+            spentSoFar,
+            remaining: remainingAmount
+        };
     };
 
-    useEffect(() => {
-        fetchBudgetData();
-    }, []);
+    const dashboardValues = calculateDashboardValues(budgetData);
+
+    // Refresh data when screen comes into focus
+    useFocusEffect(
+        React.useCallback(() => {
+            refetch();
+        }, [refetch])
+    );
 
     const onRefresh = React.useCallback(() => {
-        setRefreshing(true);
-        fetchBudgetData().finally(() => setRefreshing(false));
-    }, []);
+        refetch();
+    }, [refetch]);
 
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView
                 style={styles.scrollView}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                    <RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />
                 }
             >
                 {/* Safe to Spend Card */}
                 <Card variant="elevated" style={styles.safeToSpendCard}>
-                    <Text style={styles.cardTitle}>Safe to Spend</Text>
-                    <Text style={styles.amount}>₹{dailyBudget}</Text>
-                    <Text style={styles.subtitle}>per day for the next {daysLeft} days</Text>
-
-                    <View style={styles.budgetInfo}>
-                        <View style={styles.budgetRow}>
-                            <Text style={styles.budgetLabel}>Monthly Budget</Text>
-                            <Text style={styles.budgetValue}>₹{monthlyBudget}</Text>
-                        </View>
-                        <View style={styles.budgetRow}>
-                            <Text style={styles.budgetLabel}>Spent So Far</Text>
-                            <Text style={styles.budgetValue}>₹{spentSoFar}</Text>
-                        </View>
-                        <View style={styles.budgetRow}>
-                            <Text style={styles.budgetLabel}>Remaining</Text>
-                            <Text style={styles.budgetValue}>₹{remaining}</Text>
-                        </View>
+                    <View style={styles.cardHeader}>
+                        <Text style={styles.cardTitle}>Safe to Spend</Text>
+                        {isRefetching && (
+                            <Ionicons name="refresh" size={16} color={colors.background} style={styles.refreshIcon} />
+                        )}
                     </View>
+                    {isLoading ? (
+                        <Text style={styles.loadingText}>Loading...</Text>
+                    ) : (
+                        <>
+                            <Text style={styles.amount}>₹{dashboardValues.dailyBudget}</Text>
+                            <Text style={styles.subtitle}>per day for the next {dashboardValues.daysLeft} days</Text>
+
+                            <View style={styles.budgetInfo}>
+                                <View style={styles.budgetRow}>
+                                    <Text style={styles.budgetLabel}>Monthly Budget</Text>
+                                    <Text style={styles.budgetValue}>₹{dashboardValues.monthlyBudget}</Text>
+                                </View>
+                                <View style={styles.budgetRow}>
+                                    <Text style={styles.budgetLabel}>Spent So Far</Text>
+                                    <Text style={styles.budgetValue}>₹{dashboardValues.spentSoFar}</Text>
+                                </View>
+                                <View style={styles.budgetRow}>
+                                    <Text style={styles.budgetLabel}>Remaining</Text>
+                                    <Text style={styles.budgetValue}>₹{dashboardValues.remaining}</Text>
+                                </View>
+                            </View>
+                        </>
+                    )}
                 </Card>
 
                 {/* Can I Afford This Feature Button */}
@@ -177,11 +210,19 @@ const styles = StyleSheet.create({
         margin: spacing.lg,
         backgroundColor: colors.primary,
     },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.xs,
+    },
     cardTitle: {
         color: colors.background,
         fontSize: typography.sizes.lg,
         fontWeight: typography.weights.semibold,
-        marginBottom: spacing.xs,
+    },
+    refreshIcon: {
+        marginLeft: spacing.xs,
     },
     amount: {
         color: colors.background,
@@ -281,6 +322,12 @@ const styles = StyleSheet.create({
         color: colors.background,
         fontWeight: typography.weights.bold,
         fontSize: typography.sizes.base,
+    },
+    loadingText: {
+        color: colors.background,
+        fontSize: typography.sizes.base,
+        textAlign: 'center',
+        marginTop: spacing.md,
     },
 });
 

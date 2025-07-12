@@ -8,6 +8,7 @@ import {
     Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { Button } from '../components/Button';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -34,6 +35,7 @@ interface IncomeSource {
 const CreateBudgetSuccess: React.FC = () => {
     const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
     const route = useRoute();
+    const queryClient = useQueryClient();
     const [isCreating, setIsCreating] = useState(false);
     const { 
         amount: totalBudget, 
@@ -110,6 +112,10 @@ const CreateBudgetSuccess: React.FC = () => {
             });
 
             console.log('Budget created successfully:', result);
+
+            // Invalidate React Query cache to trigger dashboard update
+            await queryClient.invalidateQueries({ queryKey: ['activeBudgets'] });
+            await queryClient.invalidateQueries({ queryKey: ['budgets'] });
 
             // Navigate to Budgets screen
             navigation.navigate('Main', {

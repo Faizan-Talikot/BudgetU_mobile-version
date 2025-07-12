@@ -18,17 +18,17 @@ import {
     RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { colors, typography, spacing, borderRadius, shadows } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
-import { format, addMonths, subMonths } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { Calendar, type CalendarProps } from '../components/ui/calendar';
 import { TimePicker } from '../components/ui/time-picker';
 import { transactionService, type Transaction as ITransaction } from '../services/transactionService';
-import { budgetAPI, categoryAPI, type Budget } from '../services/api';
+import { budgetAPI, categoryAPI, type Budget, transactionApi, type TransactionResponse } from '../services/api';
 import { accountAPI } from '../services/api';
-import { transactionApi } from '../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -152,6 +152,7 @@ type Props = {
 }
 
 const TransactionsScreen: React.FC<Props> = ({ navigation }) => {
+    const queryClient = useQueryClient();
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [activeFilter, setActiveFilter] = useState('All');
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -215,8 +216,18 @@ const TransactionsScreen: React.FC<Props> = ({ navigation }) => {
     const fetchTransactions = async () => {
         setIsLoadingTransactions(true);
         try {
-            const apiTxs = await transactionApiWithDateRange.getAll();
-            const mapped = apiTxs.map((tx: APITransaction): TransactionDisplay => ({
+            // Calculate start and end of current month
+            const monthStart = startOfMonth(currentDate);
+            const monthEnd = endOfMonth(currentDate);
+            
+            // Format dates for API
+            const startDate = format(monthStart, 'yyyy-MM-dd');
+            const endDate = format(monthEnd, 'yyyy-MM-dd');
+            
+            const response = await transactionApi.getByDateRange(startDate, endDate);
+            const apiTxs = response.transactions;
+            
+            const mapped = apiTxs.map((tx: TransactionResponse): TransactionDisplay => ({
                 _id: tx._id,
                 type: (tx.isIncome ? 'income' : 'expense') as 'income' | 'expense' | 'transfer',
                 amount: tx.amount,
@@ -225,8 +236,8 @@ const TransactionsScreen: React.FC<Props> = ({ navigation }) => {
                 date: format(new Date(tx.date), 'MMM dd, EEEE'),
                 originalDate: new Date(tx.date), // Store original date for sorting
                 time: format(new Date(tx.date), 'hh:mm a'),
-                account: tx.account || '',
-                status: tx.status || 'budgeted',
+                account: '', // TransactionResponse doesn't have account field, will be empty
+                status: (tx.status === 'pending_assignment' ? 'budgeted' : tx.status) || 'budgeted',
             }));
             
             // Sort transactions by original date (latest first) before setting state
@@ -241,7 +252,8 @@ const TransactionsScreen: React.FC<Props> = ({ navigation }) => {
                 else if (tx.type === 'expense') expense += tx.amount;
             });
             setSummaryData({ expense, income, total: income - expense });
-        } catch (e) {
+        } catch (error) {
+            console.error('Error fetching transactions:', error);
             setTransactions([]);
             setSummaryData({ expense: 0, income: 0, total: 0 });
         } finally {
@@ -250,10 +262,10 @@ const TransactionsScreen: React.FC<Props> = ({ navigation }) => {
         }
     };
 
-    // Fetch transactions on mount
+    // Fetch transactions on mount and when currentDate changes
     useEffect(() => {
         fetchTransactions();
-    }, []);
+    }, [currentDate]);
 
     // Fetch accounts on mount
     useEffect(() => {
@@ -342,10 +354,12 @@ const TransactionsScreen: React.FC<Props> = ({ navigation }) => {
 
     const handlePreviousMonth = () => {
         setCurrentDate(prevDate => subMonths(prevDate, 1));
+        // Transactions will be refreshed automatically via useEffect when currentDate changes
     };
 
     const handleNextMonth = () => {
         setCurrentDate(prevDate => addMonths(prevDate, 1));
+        // Transactions will be refreshed automatically via useEffect when currentDate changes
     };
 
     const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -740,6 +754,12 @@ const TransactionsScreen: React.FC<Props> = ({ navigation }) => {
 
                 // Show success message and reset form
                 Alert.alert('Success', 'Transaction saved successfully');
+                
+                // Invalidate React Query cache to trigger dashboard update
+                await queryClient.invalidateQueries({ queryKey: ['activeBudgets'] });
+                await queryClient.invalidateQueries({ queryKey: ['budgets'] });
+                await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+                
                 // Reset form fields
                 setAmount('');
                 setNotes('');
@@ -1580,9 +1600,15 @@ const TransactionsScreen: React.FC<Props> = ({ navigation }) => {
                     {isLoadingTransactions ? (
                         <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 32 }} />
                     ) : Object.keys(transactionsByDate).length === 0 ? (
-                        <Text style={{ textAlign: 'center', color: colors.textSecondary, marginTop: 32 }}>
-                            No transactions
-                        </Text>
+                        <View style={styles.emptyStateContainer}>
+                            <Ionicons name="receipt-outline" size={48} color={colors.textSecondary} />
+                            <Text style={styles.emptyStateText}>
+                                No transactions for {format(currentDate, 'MMMM yyyy')}
+                            </Text>
+                            <Text style={styles.emptyStateSubtext}>
+                                Add your first transaction for this month to get started
+                            </Text>
+                        </View>
                     ) : (
                         Object.entries(transactionsByDate)
                             .sort(([dateA], [dateB]) => {
@@ -2297,6 +2323,23 @@ const styles = StyleSheet.create({
     categoryAmount: {
         fontSize: 14,
         color: colors.textSecondary,
+    },
+    emptyStateContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.lg,
+    },
+    emptyStateText: {
+        fontSize: typography.sizes.lg,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        marginBottom: spacing.sm,
+    },
+    emptyStateSubtext: {
+        fontSize: typography.sizes.base,
+        color: colors.textSecondary,
+        textAlign: 'center',
     },
 });
 
