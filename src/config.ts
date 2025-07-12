@@ -1,1 +1,1 @@
-export const API_URL = 'https://budgetu-backend.vercel.app/api'; 
+export const API_URL = 'https://budget-u-buddy.vercel.app/api'; 

@@ -6,7 +6,7 @@ const config = {
         API_URL: "http://192.168.0.101:5000/api",
     },
     production: {
-        API_URL: "https://budgetu-backend.vercel.app/api",
+        API_URL: "https://budget-u-buddy.vercel.app/api",
     },
 };
 

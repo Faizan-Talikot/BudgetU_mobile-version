@@ -24,7 +24,7 @@ export default {
   },
   extra: {
     NODE_ENV: process.env.NODE_ENV || 'production',
-    API_URL: process.env.API_URL || 'https://budgetu-backend.vercel.app',
+    API_URL: process.env.API_URL || 'https://budget-u-buddy.vercel.app',
     eas: {
       projectId: "37667c0a-f44d-4ce7-b15c-7c40319c6f32"
     }

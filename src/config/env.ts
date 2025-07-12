@@ -4,11 +4,11 @@ const ENV = {
         APP_NAME: 'BudgetU (Dev)',
     },
     staging: {
-        API_URL: 'https://budgetu-backend.vercel.app',
+        API_URL: 'https://budget-u-buddy.vercel.app',
         APP_NAME: 'BudgetU (Staging)',
     },
     production: {
-        API_URL: 'https://budgetu-backend.vercel.app',
+        API_URL: 'https://budget-u-buddy.vercel.app',
         APP_NAME: 'BudgetU',
     },
 };
