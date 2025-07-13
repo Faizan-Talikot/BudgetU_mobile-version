@@ -1,14 +1,14 @@
 const ENV = {
     development: {
-        API_URL: 'http://192.168.0.101:5000',
+        API_URL: 'https://budget-u-mobile-version.vercel.app',
         APP_NAME: 'BudgetU (Dev)',
     },
     staging: {
-        API_URL: 'https://budget-u-buddy.vercel.app',
+        API_URL: 'https://budget-u-mobile-version.vercel.app',
         APP_NAME: 'BudgetU (Staging)',
     },
     production: {
-        API_URL: 'https://budget-u-buddy.vercel.app',
+        API_URL: 'https://budget-u-mobile-version.vercel.app',
         APP_NAME: 'BudgetU',
     },
 };

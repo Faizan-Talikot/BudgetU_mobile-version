@@ -3,8 +3,8 @@ import { createBottomTabNavigator, BottomTabBar } from '@react-navigation/bottom
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, shadows } from '../theme';
 import { TabParamList } from './types';
-import { Platform } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Dash from '../screens/DashboardScreen';
 import BudgetsScreen from '../screens/BudgetsScreen';
@@ -19,24 +19,30 @@ interface TabBarIconProps {
     size: number;
 }
 console.log("TabNavigator rendered");
-const CustomTabBar = (props: any) => (
-    <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.background }}>
-        <BottomTabBar {...props} />
-    </SafeAreaView>
-);
 
-const TabNavigator = () => {
+const CustomTabBar = (props: any) => {
     const insets = useSafeAreaInsets();
     return (
+        <View>
+            <BottomTabBar {...props} />
+            {insets.bottom > 0 && (
+                <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
+            )}
+        </View>
+    );
+};
+
+const TabNavigator = () => {
+    return (
         <Tab.Navigator
-            tabBar={CustomTabBar}
+            tabBar={props => <CustomTabBar {...props} />}
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {
                     backgroundColor: colors.background,
                     borderTopColor: colors.border,
-                    minHeight: 60,
-                    paddingVertical: 8,
+                    height: 60,
+                    paddingTop: 8,
                     ...shadows.md,
                     borderTopWidth: 1,
                 },

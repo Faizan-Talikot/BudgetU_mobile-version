@@ -8,6 +8,7 @@ import {
     FlatList,
     Animated,
     StatusBar,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing, shadows } from '../theme';
@@ -20,6 +21,7 @@ import { SetBudgets } from '../components/illustrations/SetBudgets';
 import { VisualizeSpending } from '../components/illustrations/VisualizeSpending';
 import { AchieveGoals } from '../components/illustrations/AchieveGoals';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Video, ResizeMode } from 'expo-av';
 
 const { width, height } = Dimensions.get('window');
 
@@ -28,28 +30,28 @@ const onboardingData = [
         id: '1',
         title: 'Track Your Expenses',
         description: 'Effortlessly monitor your daily spending and income with our intuitive interface.',
-        Illustration: TrackExpenses,
+        image: require('../assets/images/slide1f.png'),
         gradient: ['#7C3AED', '#9F67FF'],
     },
     {
         id: '2',
         title: 'Smart Budgeting',
         description: 'Create personalized budgets and stay on top of your financial goals with real-time tracking.',
-        Illustration: SetBudgets,
+        image: require('../assets/images/slide2.png'),
         gradient: ['#3B82F6', '#60A5FA'],
     },
     {
         id: '3',
         title: 'Visual Insights',
         description: 'Transform your spending data into beautiful, easy-to-understand visual insights.',
-        Illustration: VisualizeSpending,
+        image: require('../assets/images/slide3.png'),
         gradient: ['#10B981', '#34D399'],
     },
     {
         id: '4',
         title: 'Achieve More',
         description: 'Turn your financial dreams into reality with smart goal tracking and personalized recommendations.',
-        Illustration: AchieveGoals,
+        image: require('../assets/images/slide4.png'),
         gradient: ['#F59E0B', '#FBBF24'],
     },
 ];
@@ -94,7 +96,7 @@ const OnboardingScreen = () => {
             <StatusBar barStyle="light-content" />
             <FlatList
                 data={onboardingData}
-                renderItem={({ item }) => (
+                renderItem={({ item, index }) => (
                     <View style={styles.slide}>
                         <LinearGradient
                             colors={item.gradient}
@@ -104,7 +106,15 @@ const OnboardingScreen = () => {
                         />
                         <SafeAreaView style={styles.slideContent}>
                             <View style={styles.illustrationContainer}>
-                                <item.Illustration width={width * 0.8} height={height * 0.4} />
+                                {item.image ? (
+                                    <Image
+                                        source={item.image}
+                                        style={{ width: width * 0.8, height: height * 0.4 }}
+                                        resizeMode="contain"
+                                    />
+                                ) : (
+                                    item.Illustration && <item.Illustration width={width * 0.8} height={height * 0.4} />
+                                )}
                             </View>
                             <View style={styles.textContainer}>
                                 <Text style={styles.title}>{item.title}</Text>

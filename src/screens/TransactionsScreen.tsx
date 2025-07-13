@@ -17,7 +17,7 @@ import {
     ActivityIndicator,
     RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -153,6 +153,7 @@ type Props = {
 
 const TransactionsScreen: React.FC<Props> = ({ navigation }) => {
     const queryClient = useQueryClient();
+    const insets = useSafeAreaInsets();
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [activeFilter, setActiveFilter] = useState('All');
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -783,69 +784,75 @@ const TransactionsScreen: React.FC<Props> = ({ navigation }) => {
     // Update Category Modal to use the same formatting
     const renderCategoryModal = () => {
         return (
-        <Modal
-            visible={isCategoryModalVisible}
-            animationType="fade"
-            transparent={true}
-            onRequestClose={() => setIsCategoryModalVisible(false)}
-        >
-            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' }}>
-                <View style={{ margin: 24, marginBottom: 60, backgroundColor: colors.background, borderRadius: 16, padding: 20 }}>
-                    <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
-                        Select {transactionType.toLowerCase()} category
-                        {currentBudget && ' from budget'}
-                    </Text>
-                    {isLoadingCategories ? (
-                        <ActivityIndicator size="large" color={colors.primary} />
-                    ) : availableCategories.length === 0 ? (
-                        <Text style={{ textAlign: 'center', color: colors.textSecondary, padding: 20 }}>
-                            {currentBudget 
-                                ? `No ${transactionType.toLowerCase()} categories available in current budget` 
-                                : `No ${transactionType.toLowerCase()} categories available`}
+            <Modal
+                visible={isCategoryModalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setIsCategoryModalVisible(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' }}>
+                    <View style={{ 
+                        margin: 24, 
+                        marginBottom: 24 + insets.bottom, 
+                        backgroundColor: colors.background, 
+                        borderRadius: 16, 
+                        padding: 20 
+                    }}>
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
+                            Select {transactionType.toLowerCase()} category
+                            {currentBudget && ' from budget'}
                         </Text>
-                    ) : (
-                        <ScrollView style={{ maxHeight: 300 }}>
-                                {availableCategories.map((cat) => (
-                                <TouchableOpacity
-                                        key={cat._id}
-                                        style={[
-                                            styles.categoryItem,
-                                            selectedCategory?._id === cat._id && styles.selectedCategoryItem
-                                        ]}
-                                    onPress={() => { 
-                                            console.log('Selected category:', JSON.stringify(cat, null, 2));
-                                        setSelectedCategory(cat); 
-                                        setIsCategoryModalVisible(false); 
-                                    }}
-                                >
-                                    <Ionicons 
-                                        name={(cat?.icon || 'help-circle-outline') as any} 
-                                        size={28} 
-                                        color={cat?.color || colors.primary} 
-                                        style={{ marginRight: 16 }} 
-                    />
-                    <View style={{ flex: 1 }}>
-                                            <Text style={styles.categoryName}>
-                                                {cat?.name || 'Unknown Category'}
-                                            </Text>
-                                            <Text style={[
-                                                styles.categoryAmount,
-                                                currentBudget && 
-                                                Number(cat.allocated) > 0 && 
-                                                getProjectedAmount(cat) > Number(cat.allocated) && 
-                                                styles.errorText
-                                            ]}>
-                                                {formatAmountDisplay(cat)}
-                                            </Text>
+                        {isLoadingCategories ? (
+                            <ActivityIndicator size="large" color={colors.primary} />
+                        ) : availableCategories.length === 0 ? (
+                            <Text style={{ textAlign: 'center', color: colors.textSecondary, padding: 20 }}>
+                                {currentBudget 
+                                    ? `No ${transactionType.toLowerCase()} categories available in current budget` 
+                                    : `No ${transactionType.toLowerCase()} categories available`}
+                            </Text>
+                        ) : (
+                            <ScrollView style={{ maxHeight: 300 }}>
+                                    {availableCategories.map((cat) => (
+                                    <TouchableOpacity
+                                            key={cat._id}
+                                            style={[
+                                                styles.categoryItem,
+                                                selectedCategory?._id === cat._id && styles.selectedCategoryItem
+                                            ]}
+                                        onPress={() => { 
+                                                console.log('Selected category:', JSON.stringify(cat, null, 2));
+                                            setSelectedCategory(cat); 
+                                            setIsCategoryModalVisible(false); 
+                                        }}
+                                    >
+                                        <Ionicons 
+                                            name={(cat?.icon || 'help-circle-outline') as any} 
+                                            size={28} 
+                                            color={cat?.color || colors.primary} 
+                                            style={{ marginRight: 16 }} 
+                        />
+                        <View style={{ flex: 1 }}>
+                                        <Text style={styles.categoryName}>
+                                            {cat?.name || 'Unknown Category'}
+                                        </Text>
+                                        <Text style={[
+                                            styles.categoryAmount,
+                                            currentBudget && 
+                                            Number(cat.allocated) > 0 && 
+                                            getProjectedAmount(cat) > Number(cat.allocated) && 
+                                            styles.errorText
+                                        ]}>
+                                            {formatAmountDisplay(cat)}
+                                        </Text>
+                        </View>
+                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        )}
                     </View>
-                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    )}
                 </View>
-            </View>
-        </Modal>
-    );
+            </Modal>
+        );
     };
 
     // Add function to load budget dates
